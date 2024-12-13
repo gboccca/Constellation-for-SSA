@@ -227,9 +227,7 @@ def update(frame):
 
         # Get the position in Cartesian coordinates (x, y, z in km)
         position = state.represent_as(CartesianRepresentation).xyz.to_value(u.km)
-        if i == 45:
-            radius = np.sqrt(position[0] ** 2 + position[1] ** 2 + position[2] ** 2)
-            print('orbit radius at frame', frame,':', radius)
+        
         # Ensure position is a valid sequence (numpy array or list)
         if len(position) == 3:  # Check position has x, y, z
             # Update positions and trajectories
