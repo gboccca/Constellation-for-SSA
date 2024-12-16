@@ -16,6 +16,7 @@ def from_db (value):
 def calculate_sigma(S,lamda):
 
     sigma = S**2 * np.pi/4  
+    print(sigma/(lamda**2))
     if sigma/(lamda**2) > 2.835:
         return sigma
     elif sigma/(lamda**2)< 0.00122: 
@@ -24,8 +25,7 @@ def calculate_sigma(S,lamda):
     else:
         print ('resonance in RCS!')
 
-def calculate_gain():
-    pass
+
 
 
 def calculate_peak_power_track(SNR,B,lamda,Ts,L,R,G,sigma):

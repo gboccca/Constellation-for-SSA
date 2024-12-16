@@ -10,7 +10,7 @@ np.set_printoptions(threshold=sys.maxsize)
 # ------ I/O ------ # 
 
 sigma = calculate_sigma(data.S,data.lamda)
-#print(f'RCS={sigma}')
+print(f'RCS={sigma}')
 #print( to_db(sigma))
 
 Pt = calculate_peak_power_track(data.SNR,data.B,data.lamda,data.Ts,data.L,data.R,data.G,sigma)
