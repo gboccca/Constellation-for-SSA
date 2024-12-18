@@ -6,14 +6,14 @@ k = 1.38e-23    # Boltzmann []
 # ------ design data ------ # 
 
 SNR = 10        # Signal-to-Noise Ratio [-]
+S = 0.01      # Minimum Detectable debris diameter [m]
 B = 1e6           # Bandwidth [Hz]
-lamda = 0.006   # Wavelength [m]
+lamda = np.pi*S  # Wavelength [m]
 eta = 0.3       # Antenna Efficiency [-]
-S = 0.0115      # Minimum Detectable debris diameter [m]
-N = 10000       # Number of array elements
-A = N*0.003**2  # Antenna Aperture (Effective Area) [m2]
+N = 250000       # Number of array elements
+A = N*(lamda/2)**2  # Antenna Aperture (Effective Area) [m2]
 d = lamda*0.5   # Distance between array elements [m]
-G = 10**(40/10)       # Antenna Gain [-] - from gainpattern.py
+G = 10**(50/10)       # Antenna Gain [-] - from gainpattern.py
 
 
 # ------ performance data ------ # 
@@ -27,14 +27,18 @@ R = 20000       # Range [m]
 
 def calculate_sigma(S,lamda):
 
-    sigma = S**2 * np.pi/4  
-    print(sigma/(lamda**2))
-    if sigma/(lamda**2) > 2.835:
-        return sigma
-    elif sigma/(lamda**2)< 0.00122: 
+    if np.pi*S/lamda <= 1:
         sigma = S**2 * 9/4 * np.pi**5
-        return sigma
+
+    elif np.pi*S/lamda >= 10:
+
+        sigma = S**2 * np.pi/4  
+
     else:
         raise ValueError('Resonance wavelength selected')
+    
+    return sigma
+
 
 RCS = calculate_sigma(S,lamda)
+print(f'RCS = {RCS:.2e} m2')

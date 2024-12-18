@@ -21,11 +21,15 @@ def plot_range_vs_peak_power(data):
     plt.legend()
 
     # Add markers for ranges from 0 to 100000 m, every 10000m
-    markers = [10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000]
+    markers = [20000, 40000, 50000, 60000, 70000, 80000]
     for marker in markers:
         Pt_marker = calculate_peak_power_track(data, marker)
-        plt.plot(marker, Pt_marker, 'ro')  # 'ro' means red color, circle marker
-        plt.text(marker, Pt_marker, f'{Pt_marker:.2e} W', color='red', fontsize=8)  # Place text at the marker
+        if marker <= 70000:
+            plt.plot(marker, Pt_marker, 'ro')  # 'ro' means red color, circle marker
+            plt.text(marker, Pt_marker * 1.2, f'{Pt_marker:.2e} W', color='red', fontsize=10, fontweight='bold')  # Shift text more above the marker
+        else:
+            plt.plot(marker, Pt_marker, 'ro')  # 'ro' means red color, circle marker
+            plt.text(marker, Pt_marker * 1.1, f'{Pt_marker:.2e} W', color='red', fontsize=10, fontweight='bold')  # Shift text slightly above the marker
 
     plt.show()
 
