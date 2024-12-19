@@ -161,7 +161,7 @@ def test_wrap_angle():
 
 # test_wrap_angle()
 
-#################################################
+################### PROCESS ##############################
 
 
 
@@ -324,27 +324,29 @@ def calculate_gain(Nx,Ny):
 
 
 
-dB_max = []
-N_list = []
+if __name__ == """__main__""":
 
-# Antenna parameters
-Nx = np.round(np.logspace(0,np.log10(500),100)) # number of elements in the x-direction
-Ny = np.round(np.logspace(0,np.log10(500),100)) # number of elements in the y-direction
+  print("Running the gain simulator...")
+  print("This may take a while...")
+
+  dB_max = []
+  N_list = []
+
+  # Antenna parameters
+  Nx = np.round(np.logspace(0,np.log10(500),100)) # number of elements in the x-direction
+  Ny = np.round(np.logspace(0,np.log10(500),100)) # number of elements in the y-direction
+
+  for i in range(len(Nx)):
+      dB_max.append(calculate_gain(Nx[i],Ny[i]))
+      N = Nx[i]*Ny[i]
+      print(f"Run #{i+1} completed. N: {N}. Gain: {dB_max[i]}.")
+      N_list.append(N)
 
 
-
-
-for i in range(len(Nx)):
-    dB_max.append(calculate_gain(Nx[i],Ny[i]))
-    N = Nx[i]*Ny[i]
-    print(f"Run #{i+1} completed. N: {N}. Gain: {dB_max[i]}.")
-    N_list.append(N)
-
-
-# plot the gain
-plt.plot(N,dB_max)
-plt.xlabel('Number of elements')
-plt.ylabel('Gain [dB]')
-plt.title('Gain vs Number of elements')
-plt.show()
+  # plot the gain
+  plt.plot(N,dB_max)
+  plt.xlabel('Number of elements')
+  plt.ylabel('Gain [dB]')
+  plt.title('Gain vs Number of elements')
+  plt.show()
 

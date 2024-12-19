@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np  
 
 # Define N and Gain values based on the runs
 N_values = [1, 4, 9, 16, 25, 36, 49, 64, 81, 100, 121, 144, 169, 196, 225, 256, 289, 324, 361, 400,
@@ -14,13 +15,15 @@ Gain_values = [4.97, 10.99, 14.51, 17.01, 18.95, 20.53, 21.87, 23.03, 24.05, 24.
                49.68, 50.22, 50.77, 51.33, 51.86, 52.39, 52.96, 53.5, 54.03, 54.6, 55.13, 55.68, 56.22, 
                56.77, 57.31, 57.86, 58.41, 58.95]
 
-# Plot N vs Gain
+Gain_values = [10**(gain/10) for gain in Gain_values]
+#N_values = [10* np.log10(N) for N in N_values]
+# Plot N vs Gain with markers at each data point
 plt.figure(figsize=(10, 6))
-plt.plot(N_values, Gain_values, linestyle='-', color='b', markersize=4)
+plt.plot(N_values, Gain_values, linestyle='-', color='b', marker='o', markersize=4)
 
 # Add labels and title
 plt.xlabel('N [-]')
-plt.ylabel('Gain [dB]')
+plt.ylabel('Gain [-]')
 plt.title('N vs Gain')
 plt.grid(True)
 
