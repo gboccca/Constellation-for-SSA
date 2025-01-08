@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from scipy.constants import pi,c
 
 # Antenna parameters
-Nx = 30 # number of elements in the x-direction
-Ny = 30 # number of elements in the y-direction
+Nx = 50 # number of elements in the x-direction
+Ny = 50 # number of elements in the y-direction
 dx = 0.5  # spacing between elements in the x-direction (in wavelengths)
 dy = dx  # spacing between elements in the y-direction (in wavelengths)
 freq_GHz = 10.0 # frequency (GHz)

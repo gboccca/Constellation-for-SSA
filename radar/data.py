@@ -20,7 +20,7 @@ G = 10**(50/10)       # Antenna Gain [-] - from gainpattern.py
 
 Ts = 120        # System Noise Temperature [K] assuming mattia receivers become smaller in future years
 L = 3           # Losses [-]
-R = 20000       # Range [m]
+R = 70000       # Max Range [m]
 
 
 # ------ RCS calculation ------ #

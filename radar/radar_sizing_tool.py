@@ -8,7 +8,8 @@ from equations import *
 np.set_printoptions(threshold=sys.maxsize)
 
 
-# ------ PLOTTING ------ # 
+# ------ PLOTTING FUNCTIONS ------ # 
+
 def plot_range_vs_peak_power(data):
     range_array = np.linspace(0, 100000, 1000)  # Range values in [m]
     Pt_values = []

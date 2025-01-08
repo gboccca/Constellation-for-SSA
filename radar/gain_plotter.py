@@ -1,6 +1,14 @@
 import matplotlib.pyplot as plt
 import numpy as np  
 
+''''
+
+this code plots the gain vs N obtained as a result from running the gain simulator. 
+again, this is tupid because we know that gain is a linear function of N. If anything, it works as validation of the gain pattern calculator.
+Remember to do more validation tho.
+
+
+'''
 # Define N and Gain values based on the runs
 N_values = [1, 4, 9, 16, 25, 36, 49, 64, 81, 100, 121, 144, 169, 196, 225, 256, 289, 324, 361, 400,
             484, 529, 625, 676, 784, 900, 1024, 1156, 1296, 1444, 1681, 1849, 2116, 2401, 2704, 3136,

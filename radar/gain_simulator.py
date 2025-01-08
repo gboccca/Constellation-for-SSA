@@ -2,6 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.constants import pi,c
 
+'''
+
+
+NOTE: this is kinda stupid becasue it turns out we knew all along that gain is roughly a linear function of the number of elements in the array.
+
+
+'''
 
 ################ FUNCTIONS ################
 
