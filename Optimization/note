@@ -1,0 +1,2 @@
+La simulazione del detection non funziona perchè la pf è sbagliata, se facciamo l'ottimizzazione in base ai detriti
+osservabili possiamo togliere tutta la parte della probabilità di detection.
