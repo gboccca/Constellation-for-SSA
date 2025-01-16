@@ -29,30 +29,34 @@ total_particles = 100  # Number of debris particles to simulate. if not using th
                         # if using the test dataset, must be one of the following: 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000
 
 
+
 #### Radar data
 max_range = 100 #km
 FOV = 120       #degrees
 
 
 #### Constellation data
-num_planes = 13
-num_satellites = 40
-altitude = 450 * u.km
+num_planes = 13             # Number of orbital planes for the satellites
+num_satellites = 40         # Number of satellites per plane
+altitude = 450 * u.km       # Altitude of the lowest satellite orbit
 inclination = 89 * u.deg
 raan_spacing = 360 / num_planes  # Right Ascension of the Ascending Node (RAAN) spacing
 theta_spacing = 360 / num_satellites  # True anomaly spacing
 total_sats = num_planes*num_satellites
+initialize_random_anomalies = False  # Set to True to initialize satellites with random true anomalies, False to initialize with 0 true anomaly
 
 
 ################################## DEBRIS INTIALIZATION ##################################
 
-# change true to false to use the MASTER-2009 model instead of a pre-generated dataset (still using the MASTER-2009 model)
+# depending on use_new_dataset we use the MASTER-2009 model instead of a pre-generated dataset (generated still using the MASTER-2009 model, but already saved in a file)
 
 if not use_new_dataset:
 
+    ######## to initialize the debris from test datasets ########
+
+
     if total_particles not in np.append(np.arange(100,1001,100), np.arange(2000,10001,1000)):
         raise ValueError("The total number of particles must be one of the following: 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000")
-    ######## to initialize the debris from test datasets ########
 
 
     filename = f'Optimization/test_datasets/{total_particles}debris.csv'
@@ -86,7 +90,7 @@ if not use_new_dataset:
 
 
 else:
-    ######## to initizalize the debris field based on the MASTER-2009 model ########
+    ######## to initizalize a random debris field based on the MASTER-2009 model ########
 
 
     file_path_alt = "SMDsimulations/master_results.txt"
@@ -168,7 +172,10 @@ positions_satellites = []
 for i in range(num_planes):
     raan = i * raan_spacing * u.deg
     for j in range(num_satellites):
-        true_anomaly = np.random.uniform(0, 360)*u.deg + j * theta_spacing * u.deg
+        if initialize_random_anomalies:
+            true_anomaly = np.random.uniform(0, 360)*u.deg + j * theta_spacing * u.deg
+        else:
+            true_anomaly = (j * theta_spacing + i*360/num_planes) * u.deg
         orbit = Orbit.from_classical(Earth, Earth.R + altitude + (75*i*u.km), 0 * u.one, inclination, raan, 0 * u.deg, true_anomaly)
         sat_orbits.append(orbit)
         positions_satellites.append(orbit.r.to_value(u.km))
@@ -193,7 +200,7 @@ def ex_pf(vel, distance, dim):
     return probability
 
 # implementation of the probability function
-def det_probability(probability_function, velocity, distance, size):
+def detection(probability_function, velocity, distance, size):
     detection_probability = probability_function(velocity, distance, size)
     if not (0 <= detection_probability <= 1):
         raise ValueError("Probability function returned a value outside [0,1].")
@@ -254,8 +261,8 @@ for t in time_points:
 
                 size = diameters[deb]
 
-                detection = det_probability(ex_pf, v_rel, dist, size)
-                if detection == 1:
+                
+                if detection(ex_pf, v_rel, dist, size) == 1:
                     det_deb = np.append(det_deb,deb)
                     print(f'detected debris number {deb} at time {t/3600} h')
                     #det_deb = np.unique(deb)
