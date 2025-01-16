@@ -220,6 +220,7 @@ doi = []
 det_deb = []
 
 
+
 for t in time_points:
 
     fov_check = np.zeros((total_sats, total_particles))
@@ -290,7 +291,7 @@ y = 6371 * np.outer(np.sin(u_ang), np.sin(v_ang))
 z = 6371 * np.outer(np.ones(np.size(u_ang)), np.cos(v_ang))
 earth_surface = go.Surface(x=x, y=y, z=z, colorscale='Blues', opacity=0.6, name='Earth')
 fig.add_trace(earth_surface)
-max_distance = earth_radius.to_value(u.km)
+max_distance = earth_radius.to_value(u.km) # remove unit
 # Plot positions of the generated debris field
 for i in det_deb:
     fig.add_trace(
@@ -313,4 +314,3 @@ fig.update_layout(scene=dict(
     margin=dict(l=0, r=0, b=0, t=50))
 
 fig.show()
-
