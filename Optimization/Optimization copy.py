@@ -43,7 +43,8 @@ inclination = 89 * u.deg
 raan_spacing = 360 / num_planes  # Right Ascension of the Ascending Node (RAAN) spacing
 theta_spacing = 360 / num_satellites  # True anomaly spacing
 total_sats = num_planes*num_satellites
-initialize_random_anomalies = False  # Set to True to initialize satellites with random true anomalies, False to initialize with 0 true anomaly
+initialize_random_anomalies = False     # Set to True to initialize satellites with random true anomalies, 
+                                        # False to initialize with a standard true anomaly that starts at 0 for the lowest orbit and increases by 360/num_satellites for each subsequent satellite plane
 
 
 ################################## DEBRIS INTIALIZATION ##################################
