@@ -231,9 +231,11 @@ def generate_satellites(num_planes:int, num_satellites:int, altitude, inclinatio
     return sat_orbits, positions_satellites
 
 
+################################## DYNAMIC TIMESTEP UPDATES ##################################
 
 
-################################## DEFINITION OF PROBABILITY OF DETECTION ##################################
+
+################################## DETECTION ##################################
 
 
 # example probability distribution
@@ -253,6 +255,70 @@ def detection(probability_function, velocity, distance, size):
 
     return 1 # overruling the actual return value of the probability function to detect every debris that enters the FOV
     return 1 if random.random () < detection_probability else 0
+
+def detect_debris_old(total_sats, total_particles, position_sat, position_deb, debris_orbits, sat_orbits, debris_diameters, t, max_range, FOV, ex_pf, det_deb):
+# note: switched this for detect_debris2, which is a more efficient implementation of the detection algorithm using numpy arrays instead of for loops
+# for some reason, the new function gives more detected debris than the old one
+
+    for sat in range(total_sats):
+        radar_direction = position_sat[sat]/np.linalg.norm(position_sat[sat])
+        for deb in range(total_particles):
+
+            # Check for debris in the field of view of the satellites
+            rel_position = position_sat[sat] - position_deb[deb]
+            dist = np.linalg.norm(rel_position)
+            cos_angle = np.dot(rel_position/dist, radar_direction)
+            angle = np.arccos(cos_angle) * (180 / np.pi)
+
+            if dist < max_range and angle<FOV:
+
+                #print('debris number: ', deb, ' enters fov')
+                # Get debris velocity and size to calculate detection probability
+                v_deb = debris_orbits[deb].propagate(t).v
+                v_sat = sat_orbits[sat].propagate(t).v
+                v_rel = v_deb - v_sat
+                size = diameters[deb]
+                
+                # Check if debris is detected
+                if detection(ex_pf, v_rel, dist, size) == 1:
+                    det_deb = np.append(det_deb,deb)
+                    print(f'Detected debris number {deb} at time {t/3600} h')
+    
+    return det_deb
+
+
+def detect_debris(position_sat, position_deb, debris_orbits, sat_orbits, debris_diameters, t, max_range, FOV, ex_pf, det_deb, timestep):
+
+    for sat in range(len(position_sat)):
+        rel_positions = position_deb - position_sat[sat]
+        distances = np.linalg.norm(rel_positions, axis=1)
+        angles = np.arccos(np.dot(rel_positions, position_sat[sat])/(np.linalg.norm(position_sat[sat])*np.linalg.norm(rel_positions))) * (180 / np.pi)
+
+        debris_in_FOV = np.where((distances < max_range) & (angles < FOV))[0] # row indices of debris in FOV
+
+
+
+        #print(f'Debris in FOV: {debris_in_FOV}')
+
+        det_deb = np.append(det_deb, debris_in_FOV)
+
+    return det_deb
+
+""" Temporarily removed this section because the probabiliyu function is not implemented
+
+        for deb in debris_in_FOV:
+            v_deb = debris_orbits[deb].propagate(t).v
+            v_sat = sat_orbits[sat].propagate(t).v
+            v_rel = v_deb - v_sat
+            size = debris_diameters[deb]
+            if detection(ex_pf, v_rel, distances[deb], size) == 1:
+                det_deb = np.append(det_deb, deb)
+                print(f'Detected debris number {deb} at time {t/3600} h')
+    
+    return det_deb
+
+"""
+
 
 ################################## ORBIT PROPAGATION ##################################
 
@@ -281,7 +347,7 @@ position_sat = np.zeros((total_sats, 3))      # satellite positions in cartesian
 v_debs = np.zeros((total_particles, 3))
 soi = []
 doi = []
-det_deb = []
+det_deb=[]
 t   = start_time
 
 debris_orbits, diameters = generate_debris(use_new_dataset, total_particles)
@@ -291,60 +357,16 @@ sat_orbits, positions_satellites = generate_satellites(sat_planes_number, sat_nu
 while t < time_of_flight:
 
     t += time_step
-
-    fov_check = np.zeros((total_sats, total_particles))
     print(format_time(t.to_value(u.s)))
 
     # Calculate the positions of the debris and satellites at the current time
-    for i, orbit_deb in enumerate(debris_orbits):
-        state_deb = orbit_deb.propagate(t)
-        position_deb[i] = state_deb.represent_as(CartesianRepresentation).xyz.to_value(u.km)
+    position_deb = propagate_all_orbits(debris_orbits, position_deb, t)
+    position_sat = propagate_all_orbits(sat_orbits, position_sat, t)
 
+    # Apply detection algorithm
+    #det_deb = detect_debris_old(total_sats, total_particles, position_sat, position_deb, debris_orbits, sat_orbits, diameters, t, max_range, FOV, ex_pf, det_deb)
+    det_deb = detect_debris(position_sat, position_deb, debris_orbits, sat_orbits, diameters, t, max_range, FOV, ex_pf, det_deb, time_step)
 
-    for i, orbit_sat in enumerate(sat_orbits):
-        state_sat = orbit_sat.propagate(t)
-        position_sat[i] = state_sat.represent_as(CartesianRepresentation).xyz.to_value(u.km)
-
-    # Check for debris in the field of view of the satellites
-    for sat in range(total_sats):
-        radar_direction = position_sat[sat]/np.linalg.norm(position_sat[sat])
-        for deb in range(total_particles):
-
-            rel_position = position_sat[sat] - position_deb[deb]
-            dist = np.linalg.norm(rel_position)
-
-            if dist < max_range:
-                ran = 1
-            else:
-                ran = 0
-
-            cos_angle = np.dot(rel_position/dist, radar_direction)
-            angle = np.arccos(cos_angle) * (180 / np.pi)
-
-            if angle < FOV:
-                fov = 1
-            else:
-                fov = 0
-            if fov*ran == 1:
-                v_deb = debris_orbits[deb].propagate(t).v
-                v_sat = sat_orbits[sat].propagate(t).v
-                v_rel = v_deb - v_sat
-                #print('debris number: ', deb, ' enters fov')
-
-                size = diameters[deb]
-
-                
-                if detection(ex_pf, v_rel, dist, size) == 1:
-                    det_deb = np.append(det_deb,deb)
-                    print(f'detected debris number {deb} at time {t/3600} h')
-                    #det_deb = np.unique(deb)
-
-    for deb in doi:
-        v_debs[deb] = debris_orbits[deb].propagate(t).v
-
-    v_sats = np.zeros((total_sats, 1))
-    for sat in soi:
-        v_sats[sat] = sat_orbits[sat].propagate(t).v
 
 det_deb = np.unique(det_deb)
 det_deb = det_deb.astype(int)
