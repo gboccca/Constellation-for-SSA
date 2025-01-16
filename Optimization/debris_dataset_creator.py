@@ -54,6 +54,8 @@ data_alt['Probability'] = data_alt['Total'] / data_alt['Total'].sum()
 data_incl['Probability'] = total_density/total_sum
 data_diam['Probability'] = data_diam['Total'] / data_diam['Total'].sum()
 
+
+# Generate test datasets
 dataset_sizes = np.append(np.arange(100,1001,100), np.arange(2000,10001,1000))
 print(dataset_sizes)
 for size in dataset_sizes:
@@ -73,9 +75,9 @@ for size in dataset_sizes:
     true_anomaly = np.random.uniform(0, 360, total_particles)
     radii = (altitudes+earth_radius)
 
+# note: i removed the units here to simplify the parsing process. the units are added back in the optimization code
 
     dataset = {
-        "radii": radii,
         "latitudes": latitudes,
         "eccentricities": eccentricities,
         "r_ascension": r_ascension,
@@ -96,7 +98,7 @@ for size in dataset_sizes:
     print(f"List saved successfully to '{filename}'")
 
 
-
+# verify datasets are parsed correctly. note: forced the conversion to float64
     if True:
         ######## to initialize the debris from test datasets ########
 
@@ -113,8 +115,6 @@ for size in dataset_sizes:
         print(f"Dictionary reconstructed from '{filename}':")
         #print(data)
 
-
-        radii_parsed = np.array(dataset_parsed['radii'], dtype=np.float64)
         latitudes_parsed = np.array(dataset_parsed['latitudes'], dtype=np.float64)
         eccentricities_parsed = np.array(dataset_parsed['eccentricities'], dtype=np.float64)
         r_ascension_parsed = np.array(dataset_parsed['r_ascension'], dtype=np.float64)
@@ -123,8 +123,7 @@ for size in dataset_sizes:
         diameters_parsed = np.array(dataset_parsed['diameters'], dtype=np.float64)
         altitudes_parsed = np.array(dataset_parsed['altitudes'], dtype=np.float64)
 
-        parsed_difference = [radii - radii_parsed,
-                            latitudes - latitudes_parsed,
+        parsed_difference = [latitudes - latitudes_parsed,
                             eccentricities - eccentricities_parsed,
                             r_ascension - r_ascension_parsed,
                             arg_periapsis - arg_periapsis_parsed,

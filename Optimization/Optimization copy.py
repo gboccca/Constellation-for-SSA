@@ -15,7 +15,7 @@ import csv
 
 #### Constants
 M_earth = 5.972e24  # Earth mass in kg, only needed if you are manually calculating T
-earth_radius = 6371.0  # in km
+earth_radius = 6371.0 *u.km # in km
 G = 6.67430e-20  # Gravitational constant in km^3 / (kg * s^2)
 
 
@@ -24,6 +24,9 @@ time_of_flight = 0.1 * u.hour
 time_step = 10 * u.s
 n_steps = int((time_of_flight / time_step).decompose())  # Total steps
 time_points = [(k * time_step) for k in range(n_steps)]
+use_new_dataset = False  # Set to True to use the test dataset, False to use the MASTER-2009 model
+total_particles = 100  # Number of debris particles to simulate. if not using the test dataset, can be arbitrarily chosen. 
+                        # if using the test dataset, must be one of the following: 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000
 
 
 #### Radar data
@@ -45,10 +48,13 @@ total_sats = num_planes*num_satellites
 
 # change true to false to use the MASTER-2009 model instead of a pre-generated dataset (still using the MASTER-2009 model)
 
-if True:
+if not use_new_dataset:
+
+    if total_particles not in np.append(np.arange(100,1001,100), np.arange(2000,10001,1000)):
+        raise ValueError("The total number of particles must be one of the following: 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000")
     ######## to initialize the debris from test datasets ########
 
-    total_particles = 100
+
     filename = f'Optimization/test_datasets/{total_particles}debris.csv'
     # Read CSV into a dictionary
     with open(filename, "r") as file:
@@ -61,26 +67,27 @@ if True:
     print(f"Dictionary reconstructed from '{filename}':")
     
 
-    radii = np.array(dataset['radii'], dtype=np.float64)*u.km
-    latitudes = np.array(dataset['latitudes'], dtype=np.float64) # conversion dones in Orbit.from_classical
+
+    latitudes = np.array(dataset['latitudes'], dtype=np.float64)*u.deg
     eccentricities = np.array(dataset['eccentricities'], dtype=np.float64)*u.one
     r_ascension = np.array(dataset['r_ascension'], dtype=np.float64)*u.deg
     arg_periapsis = np.array(dataset['arg_periapsis'], dtype=np.float64)*u.deg
     true_anomaly = np.array(dataset['true_anomaly'], dtype=np.float64)*u.deg
     diameters = np.array(dataset['diameters'], dtype=np.float64) # unitless as of now
-    altitudes = np.array(dataset['altitudes'], dtype=np.float64) # unused as of now
+    altitudes = np.array(dataset['altitudes'], dtype=np.float64)*u.km
+    radii = (altitudes+earth_radius)
 
 
 
     # Generate debris orbits
     debris_orbits = [
-        Orbit.from_classical(Earth, rad, ecc, inc*u.deg, raan, argp, nu, Time.now()) for rad, inc, ecc, raan, argp, nu in zip(radii, latitudes, eccentricities, r_ascension, arg_periapsis, true_anomaly)
+        Orbit.from_classical(Earth, rad, ecc, inc, raan, argp, nu, Time.now()) for rad, inc, ecc, raan, argp, nu in zip(radii, latitudes, eccentricities, r_ascension, arg_periapsis, true_anomaly)
     ]
 
 
 else:
     ######## to initizalize the debris field based on the MASTER-2009 model ########
-    total_particles = 1000  # Total number of debris particles (to simulate)
+
 
     file_path_alt = "SMDsimulations/master_results.txt"
     file_path_incl = "SMDsimulations/MASTER2_declination_distribution.txt"
@@ -124,8 +131,8 @@ else:
     data_diam['Probability'] = data_diam['Total'] / data_diam['Total'].sum()
 
     # Select random orbit altitudes, inclinations and diameters based on the computed probabilities
-    altitudes = np.random.choice(data_alt['Altitude'], size=total_particles, p=data_alt['Probability'])
-    latitudes = np.random.choice(data_incl['Declination'], size=total_particles, p=data_incl['Probability'])
+    altitudes = np.random.choice(data_alt['Altitude'], size=total_particles, p=data_alt['Probability'])*u.km
+    latitudes = np.random.choice(data_incl['Declination'], size=total_particles, p=data_incl['Probability'])*u.deg
     latitudes += 90
     diameters = np.random.choice(data_diam['Diameter'], size=total_particles, p=data_diam['Probability'])
 
@@ -134,13 +141,13 @@ else:
     r_ascension = np.random.uniform(0,360, total_particles)*u.deg
     arg_periapsis = np.random.uniform(0, 360, total_particles)*u.deg
     true_anomaly = np.random.uniform(0, 360, total_particles)*u.deg
-    radii = (altitudes+earth_radius)*u.km
+    radii = (altitudes+earth_radius)
 
 
 
     # Generate debris orbits
     debris_orbits = [
-        Orbit.from_classical(Earth, rad, ecc, inc*u.deg, raan, argp, nu, Time.now()) for rad, inc, ecc, raan, argp, nu in zip(radii, latitudes, eccentricities, r_ascension, arg_periapsis, true_anomaly)
+        Orbit.from_classical(Earth, rad, ecc, inc, raan, argp, nu, Time.now()) for rad, inc, ecc, raan, argp, nu in zip(radii, latitudes, eccentricities, r_ascension, arg_periapsis, true_anomaly)
     ]
 
 
@@ -157,7 +164,6 @@ def position_from_orbital_elements(orbit:Orbit, num_points=100):
 
 sat_orbits = []
 positions_satellites = []
-earth_radius = 6371 * u.km 
 
 for i in range(num_planes):
     raan = i * raan_spacing * u.deg
