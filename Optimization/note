@@ -1,2 +1,16 @@
 La simulazione del detection non funziona perchè la pf è sbagliata, se facciamo l'ottimizzazione in base ai detriti
 osservabili possiamo togliere tutta la parte della probabilità di detection.
+
+times with detect_debris2:
+20.549795627593994
+20.691245317459106
+20.526498317718506
+with more satellites:
+40.48849844932556
+
+times with detect_debris:
+21.2354998588562
+21.051828861236572
+21.322001218795776
+with more satellites:
+41.00621294975281

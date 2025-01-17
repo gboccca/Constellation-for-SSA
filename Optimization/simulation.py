@@ -10,6 +10,7 @@ from astropy.time import Time, TimeDelta
 import plotly.graph_objects as go
 import random
 import csv
+import time
 from generic_tools import format_time
 
 ################################## INPUTS ##################################
@@ -22,17 +23,20 @@ G = 6.67430e-20  # Gravitational constant in km^3 / (kg * s^2)
 
 #### Simulation parameters
 time_of_flight = 0.1 * u.hour
-time_step = 10 * u.s
+
 use_new_dataset = False  # Set to True to use the test dataset, False to use the MASTER-2009 model
 total_particles = 100  # Number of debris particles to simulate. if not using the test dataset, can be arbitrarily chosen. 
                         # if using the test dataset, must be one of the following: 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000
 start_time = 0*u.s      # Start time of the simulation
-
+min_timestep = 1 * u.s
+max_timestep = 10 * u.s
+time_step = max_timestep
+safe_distance = 150         # used for dynamic timestep
 
 
 #### Radar data
 max_range = 100 #km
-FOV = 120       #degrees
+FOV = 60        #field of view half-width, degrees
 
 
 #### Constellation data
@@ -233,7 +237,35 @@ def generate_satellites(num_planes:int, num_satellites:int, altitude, inclinatio
 
 ################################## DYNAMIC TIMESTEP UPDATES ##################################
 
+def update_timestep(distances, max_timestep, min_timestep, safe_distance):
 
+    distance_check = np.where(distances < safe_distance, 1, 0)
+    if np.any(distance_check):
+        return min_timestep + (max_timestep - min_timestep)*(np.min(distances[distance_check]) / safe_distance)
+    else:
+        return max_timestep
+
+# this doesnt work
+
+################################## ORBIT PROPAGATION ##################################
+
+def propagate_all_orbits(orbits:list, positions:np.array, time):
+    """
+    Propagate all orbits to a given time.
+    
+    Args:
+        orbits (list): List of Orbit objects to propagate.
+        positions (np.array): 3D positions of the orbits in Cartesian coordinates up until t-1.
+        time (Time): Time to propagate the orbits to.
+        
+    Returns:
+        np.array: 3D positions of the orbits in Cartesian coordinates.
+        
+    """
+    for i, orbit in enumerate(orbits):
+        state = orbit.propagate(time)
+        positions[i, :] = state.represent_as(CartesianRepresentation).xyz.to_value(u.km)
+    return positions
 
 ################################## DETECTION ##################################
 
@@ -258,18 +290,17 @@ def detection(probability_function, velocity, distance, size):
 
 def detect_debris_old(total_sats, total_particles, position_sat, position_deb, debris_orbits, sat_orbits, debris_diameters, t, max_range, FOV, ex_pf, det_deb):
 # note: switched this for detect_debris2, which is a more efficient implementation of the detection algorithm using numpy arrays instead of for loops
-# for some reason, the new function gives more detected debris than the old one
+# for some reason, the new function gives more detected debris than the old one - fixed: i swithed the sign of rel_position in the angle calculation, it was was wrong here. the correct is deb-sat, not sat-deb
 
     for sat in range(total_sats):
         radar_direction = position_sat[sat]/np.linalg.norm(position_sat[sat])
         for deb in range(total_particles):
 
             # Check for debris in the field of view of the satellites
-            rel_position = position_sat[sat] - position_deb[deb]
+            rel_position =  position_deb[deb] - position_sat[sat]
             dist = np.linalg.norm(rel_position)
             cos_angle = np.dot(rel_position/dist, radar_direction)
             angle = np.arccos(cos_angle) * (180 / np.pi)
-
             if dist < max_range and angle<FOV:
 
                 #print('debris number: ', deb, ' enters fov')
@@ -287,18 +318,20 @@ def detect_debris_old(total_sats, total_particles, position_sat, position_deb, d
     return det_deb
 
 
-def detect_debris(position_sat, position_deb, debris_orbits, sat_orbits, debris_diameters, t, max_range, FOV, ex_pf, det_deb, timestep):
+def detect_debris(position_sat, position_deb, debris_orbits, sat_orbits, debris_diameters, t, max_range, FOV, ex_pf, det_deb, max_timestep, min_timestep, safe_distance):
 
     for sat in range(len(position_sat)):
-        rel_positions = position_deb - position_sat[sat]
+        rel_positions = position_deb - position_sat[sat]                # correct formula
         distances = np.linalg.norm(rel_positions, axis=1)
-        angles = np.arccos(np.dot(rel_positions, position_sat[sat])/(np.linalg.norm(position_sat[sat])*np.linalg.norm(rel_positions))) * (180 / np.pi)
+        cosines = np.dot(rel_positions, position_sat[sat])/(np.linalg.norm(position_sat[sat])*distances)
+        angles = np.arccos(cosines)* (180 / np.pi)
+        # note: removed radar direction vector in angle calculation because it is the same as the satellite position vector
 
+        #time_step = update_timestep(distances, max_timestep, min_timestep, safe_distance)
         debris_in_FOV = np.where((distances < max_range) & (angles < FOV))[0] # row indices of debris in FOV
 
 
-
-        #print(f'Debris in FOV: {debris_in_FOV}')
+        # print(f'Debris in FOV: {debris_in_FOV}')
 
         det_deb = np.append(det_deb, debris_in_FOV)
 
@@ -318,27 +351,23 @@ def detect_debris(position_sat, position_deb, debris_orbits, sat_orbits, debris_
     return det_deb
 
 """
+def detect_debris2(position_sat, position_deb, max_range, FOV, det_deb, time_step):
+    # work in progress, use detect_debris instead
+    rel_positions = position_deb[:, np.newaxis, :] - position_sat[np.newaxis, :, :]     # relative positions of debris to satellites. shape: (total_debris, total_sats, 3)
+    distances = np.linalg.norm(rel_positions, axis=2)                                   # distances between debris and satellites. shape: (total_debris, total_sats)
+    dotproducts = np.sum(rel_positions*position_sat, axis=2)                            # dot product between relative positions and satellite positions. shape: (total_debris, total_sats)
+    normproducts = np.linalg.norm(position_sat, axis=1)*distances                       # product of norms of relative and satellite positions. shape: (total_debris, total_sats)
+    angles = np.arccos(dotproducts/normproducts) * (180 / np.pi)                        # angles between debris and satellites. shape: (total_debris, total_sats)        
 
+    debris_in_FOV = np.argwhere((distances < max_range) & (angles < FOV)) # row indices of debris in FOV
+    #print(f'Debris in FOV: {debris_in_FOV}')
+    debris_in_FOV = np.unique(debris_in_FOV[:, 0])
+    #print(f'Debris in FOV: {debris_in_FOV}')
 
-################################## ORBIT PROPAGATION ##################################
+    det_deb = np.append(det_deb, debris_in_FOV)
 
-def propagate_all_orbits(orbits:list, positions:np.array, time):
-    """
-    Propagate all orbits to a given time.
-    
-    Args:
-        orbits (list): List of Orbit objects to propagate.
-        positions (np.array): 3D positions of the orbits in Cartesian coordinates up until t-1.
-        time (Time): Time to propagate the orbits to.
-        
-    Returns:
-        np.array: 3D positions of the orbits in Cartesian coordinates.
-        
-    """
-    for i, orbit in enumerate(orbits):
-        state = orbit.propagate(time)
-        positions[i, :] = state.represent_as(CartesianRepresentation).xyz.to_value(u.km)
-    return positions
+    return det_deb
+
 
 ################################## SIMULATION ##################################
 
@@ -353,7 +382,7 @@ t   = start_time
 debris_orbits, diameters = generate_debris(use_new_dataset, total_particles)
 sat_orbits, positions_satellites = generate_satellites(sat_planes_number, sat_number, sat_min_altitude, sat_inclination, sat_raan_spacing, sat_theta_spacing, initialize_random_anomalies)
 
-
+start_time = time.time()
 while t < time_of_flight:
 
     t += time_step
@@ -365,12 +394,15 @@ while t < time_of_flight:
 
     # Apply detection algorithm
     #det_deb = detect_debris_old(total_sats, total_particles, position_sat, position_deb, debris_orbits, sat_orbits, diameters, t, max_range, FOV, ex_pf, det_deb)
-    det_deb = detect_debris(position_sat, position_deb, debris_orbits, sat_orbits, diameters, t, max_range, FOV, ex_pf, det_deb, time_step)
+    det_deb = detect_debris(position_sat, position_deb, debris_orbits, sat_orbits, diameters, t, max_range, FOV, ex_pf, det_deb, max_timestep, min_timestep, safe_distance)   # slightly slower than detect_debris2
+    #det_deb = detect_debris2(position_sat, position_deb, max_range, FOV, det_deb, time_step)
 
-
+end_time = time.time()
+elapsed_time = end_time - start_time
 det_deb = np.unique(det_deb)
 det_deb = det_deb.astype(int)
 print(f"Detected Debris: {det_deb}")
+print(f"Run duration: {elapsed_time} s")
 
 ################################## PLOTTING RESULTS ##################################
 
