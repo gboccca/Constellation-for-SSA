@@ -28,10 +28,10 @@ use_new_dataset = False  # Set to True to use the test dataset, False to use the
 total_particles = 100  # Number of debris particles to simulate. if not using the test dataset, can be arbitrarily chosen. 
                         # if using the test dataset, must be one of the following: 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000
 start_time = 0*u.s      # Start time of the simulation
-min_timestep = 1 * u.s
-max_timestep = 10 * u.s
-time_step = max_timestep
-safe_distance = 150         # used for dynamic timestep
+min_timestep_default = 0.5 * u.s
+max_timestep_default = 10 * u.s
+time_step = max_timestep_default
+safe_range_default = 200         # used for dynamic timestep
 
 
 #### Radar data
@@ -237,15 +237,17 @@ def generate_satellites(num_planes:int, num_satellites:int, altitude, inclinatio
 
 ################################## DYNAMIC TIMESTEP UPDATES ##################################
 
-def update_timestep(distances, max_timestep, min_timestep, safe_distance):
+def update_timestep(distances, timestep, max_timestep=max_timestep_default, min_timestep=min_timestep_default, safe_range=safe_range_default):
 
-    distance_check = np.where(distances < safe_distance, 1, 0)
-    if np.any(distance_check):
-        return min_timestep + (max_timestep - min_timestep)*(np.min(distances[distance_check]) / safe_distance)
-    else:
-        return max_timestep
+    if np.any(np.argwhere(distances < safe_range)):                                     # update timestep if debris is too close to a satellite
+        timestep = max(min_timestep, timestep - 0.1*u.s)
+        print('Debris too close to satellite, reducing timestep to ', timestep)
+        return timestep
+    else: 
+        timestep = max_timestep
+        print('No debris too close to satellite, increasing timestep to ', timestep)
+        return max_timestep   
 
-# this doesnt work
 
 ################################## ORBIT PROPAGATION ##################################
 
@@ -318,7 +320,7 @@ def detect_debris_old(total_sats, total_particles, position_sat, position_deb, d
     return det_deb
 
 
-def detect_debris(position_sat, position_deb, debris_orbits, sat_orbits, debris_diameters, t, max_range, FOV, ex_pf, det_deb, max_timestep, min_timestep, safe_distance):
+def detect_debris(position_sat, position_deb, debris_orbits, sat_orbits, debris_diameters, t, max_range, FOV, ex_pf, det_deb, timestep):
 
     for sat in range(len(position_sat)):
         rel_positions = position_deb - position_sat[sat]                # correct formula
@@ -327,7 +329,7 @@ def detect_debris(position_sat, position_deb, debris_orbits, sat_orbits, debris_
         angles = np.arccos(cosines)* (180 / np.pi)
         # note: removed radar direction vector in angle calculation because it is the same as the satellite position vector
 
-        #time_step = update_timestep(distances, max_timestep, min_timestep, safe_distance)
+        timestep = update_timestep(distances,timestep)
         debris_in_FOV = np.where((distances < max_range) & (angles < FOV))[0] # row indices of debris in FOV
 
 
@@ -335,7 +337,7 @@ def detect_debris(position_sat, position_deb, debris_orbits, sat_orbits, debris_
 
         det_deb = np.append(det_deb, debris_in_FOV)
 
-    return det_deb
+    return det_deb,timestep
 
 """ Temporarily removed this section because the probabiliyu function is not implemented
 
@@ -351,22 +353,25 @@ def detect_debris(position_sat, position_deb, debris_orbits, sat_orbits, debris_
     return det_deb
 
 """
-def detect_debris2(position_sat, position_deb, max_range, FOV, det_deb, time_step):
+def detect_debris2(position_sat, position_deb, max_range, FOV, det_deb, timestep):
+
+    """
+    Slightly more efficient implementation of the detection algorithm using numpy arrays instead of for loops.
+    """
     # work in progress, use detect_debris instead
     rel_positions = position_deb[:, np.newaxis, :] - position_sat[np.newaxis, :, :]     # relative positions of debris to satellites. shape: (total_debris, total_sats, 3)
     distances = np.linalg.norm(rel_positions, axis=2)                                   # distances between debris and satellites. shape: (total_debris, total_sats)
     dotproducts = np.sum(rel_positions*position_sat, axis=2)                            # dot product between relative positions and satellite positions. shape: (total_debris, total_sats)
     normproducts = np.linalg.norm(position_sat, axis=1)*distances                       # product of norms of relative and satellite positions. shape: (total_debris, total_sats)
-    angles = np.arccos(dotproducts/normproducts) * (180 / np.pi)                        # angles between debris and satellites. shape: (total_debris, total_sats)        
+    angles = np.arccos(dotproducts/normproducts) * (180 / np.pi)                        # angles between debris and satellites. shape: (total_debris, total_sats)
 
-    debris_in_FOV = np.argwhere((distances < max_range) & (angles < FOV)) # row indices of debris in FOV
-    #print(f'Debris in FOV: {debris_in_FOV}')
+    timestep = update_timestep(distances, timestep)  
+         
+    debris_in_FOV = np.argwhere((distances < max_range) & (angles < FOV))               # row indices of debris in FOV
     debris_in_FOV = np.unique(debris_in_FOV[:, 0])
-    #print(f'Debris in FOV: {debris_in_FOV}')
-
     det_deb = np.append(det_deb, debris_in_FOV)
 
-    return det_deb
+    return det_deb, timestep
 
 
 ################################## SIMULATION ##################################
@@ -394,8 +399,8 @@ while t < time_of_flight:
 
     # Apply detection algorithm
     #det_deb = detect_debris_old(total_sats, total_particles, position_sat, position_deb, debris_orbits, sat_orbits, diameters, t, max_range, FOV, ex_pf, det_deb)
-    det_deb = detect_debris(position_sat, position_deb, debris_orbits, sat_orbits, diameters, t, max_range, FOV, ex_pf, det_deb, max_timestep, min_timestep, safe_distance)   # slightly slower than detect_debris2
-    #det_deb = detect_debris2(position_sat, position_deb, max_range, FOV, det_deb, time_step)
+    #det_deb = detect_debris(position_sat, position_deb, debris_orbits, sat_orbits, diameters, t, max_range, FOV, ex_pf, det_deb, time_step)   # slightly slower than detect_debris2
+    det_deb, time_step = detect_debris2(position_sat, position_deb, max_range, FOV, det_deb, time_step)
 
 end_time = time.time()
 elapsed_time = end_time - start_time
@@ -405,6 +410,8 @@ print(f"Detected Debris: {det_deb}")
 print(f"Run duration: {elapsed_time} s")
 
 ################################## PLOTTING RESULTS ##################################
+
+
 
 fig = go.Figure()
 
