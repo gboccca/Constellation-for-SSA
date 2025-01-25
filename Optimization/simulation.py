@@ -39,16 +39,6 @@ max_range = 100 #km
 FOV = 60        #field of view half-width, degrees
 
 
-#### Constellation data
-sat_planes_number = 13             # Number of orbital planes for the satellites
-sat_number = 40         # Number of satellites per plane
-sat_min_altitude = 450 * u.km       # Altitude of the lowest satellite orbit
-sat_inclination = 89 * u.deg
-sat_raan_spacing = (360 / sat_number)*u.deg  # Right Ascension of the Ascending Node (RAAN) spacing
-sat_theta_spacing = (360 / sat_number)*u.deg  # True anomaly spacing
-total_sats = sat_planes_number*sat_number
-initialize_random_anomalies = False     # Set to True to initialize satellites with random true anomalies, 
-                                        # False to initialize with a standard true anomaly that starts at 0 for the lowest orbit and increases by 360/num_satellites for each subsequent satellite plane
 
 
 ################################## DEBRIS INTIALIZATION ##################################
@@ -182,7 +172,7 @@ def generate_debris(use_new_dataset, total_debris):
 ################################## CONSTELLATION INITIALIZATION ##################################
 
 
-def generate_satellites(num_planes:int, num_satellites:int, altitude, inclination, raan_spacing, theta_spacing, initialize_random_anomalies):
+def generate_satellites_old(num_planes:int, num_satellites:int, altitude, inclination, raan_spacing, theta_spacing, initialize_random_anomalies):
     """
     Generate a constellation of satellites in a given number of planes with a given number of satellites per plane.
 
@@ -211,9 +201,65 @@ def generate_satellites(num_planes:int, num_satellites:int, altitude, inclinatio
             else:
                 true_anomaly = (j * theta_spacing + i*360*u.deg/num_planes)
             orbit = Orbit.from_classical(Earth, Earth.R + altitude + (75*i*u.km), 0 * u.one, inclination, raan, 0 * u.deg, true_anomaly)
+            print(true_anomaly)
+            
             sat_orbits.append(orbit)
             positions_satellites.append(orbit.r.to_value(u.km))
     return sat_orbits, positions_satellites
+
+
+class Constellation:
+
+    def __init__(self, altitudes:list, sat_distribution:list, inclination, raan_spacing, argument_periapsis, eccentricity = 0):
+        self.altitudes = altitudes
+        self.sat_distribution = sat_distribution
+        self.inclination = inclination
+        self.raan_spacing = raan_spacing
+        self.argument_periapsis = argument_periapsis
+        self.eccentricity = eccentricity
+        self.total_sats = sum(sat_distribution)
+
+
+    def generate_satellites(self):
+        """
+        Generate a constellation of satellites in a given number of planes with a given number of satellites per plane.
+
+        Args:
+            altitudes (list): List of altitudes for the satellite planes.
+            sat_distribution (list): List of number of satellites per plane.
+            inclination (deg): Inclination of the satellite orbits.
+            raan_spacing (deg): Right Ascension of the Ascending Node (RAAN) spacing.
+            argument_periapsis (deg): Argument of Periapsis.
+            eccentricity (float): Eccentricity of the satellite orbits. Default is 0.
+
+        Returns:
+            list: List of Orbit objects representing the satellite orbits.
+        """
+
+        self.sat_orbits = []
+        num_planes = len(self.altitudes)     # Number of orbital planes
+
+        for i in range(num_planes):
+            altitude = self.altitudes[i]                 # Altitude of the current plane
+            num_sats = sat_distribution[i]          # Number of satellites in the current plane
+            theta_spacing = 360/num_sats * u.deg    # Spacing between satellites in the plane (equally spaced)
+            theta_offset = 360*i*u.deg/num_planes   # Offset per orbit to distribute satellites evenly in the constellation
+            raan = i * self.raan_spacing                 # RAAN for the current plane
+
+
+            for j in range(num_sats):
+                true_anomaly = j * theta_spacing + theta_offset  # Spacing satellites evenly in the plane
+                orbit = Orbit.from_classical(
+                    Earth,
+                    Earth.R + altitude,  # Semi-major axis (altitude above Earth's radius)
+                    self.eccentricity * u.one,  # Eccentricity
+                    self.inclination,  # Inclination (defaulting to polar orbit, can be adjusted if needed)
+                    raan,  # Right Ascension of Ascending Node
+                    self.argument_periapsis,  # Argument of Periapsis
+                    true_anomaly,  # True Anomaly
+                )
+                self.sat_orbits.append(orbit)
+
 
 
 ################################## DYNAMIC TIMESTEP UPDATES ##################################
@@ -461,15 +507,35 @@ def plot_simulation_results(det_deb, position_deb):
 
 if __name__ == "__main__":
 
+
+    #### Constellation data
+    sat_planes_number = 13             # Number of orbital planes for the satellites
+    sat_number = 40         # Number of satellites per plane
+    sat_min_altitude = 450 * u.km       # Altitude of the lowest satellite orbit
+    sat_inclination = 90 * u.deg
+    sat_raan_spacing = (360 / sat_planes_number)*u.deg  # Right Ascension of the Ascending Node (RAAN) spacing
+    sat_theta_spacing = (360 / sat_number)*u.deg  # True anomaly spacing
+    sat_argument_periapsis = 0*u.deg
+    total_sats = sat_planes_number*sat_number
+    initialize_random_anomalies = False     # Set to True to initialize satellites with random true anomalies, 
+                                            # False to initialize with a standard true anomaly that starts at 0 for the lowest orbit and increases by 360/num_satellites for each subsequent satellite plane
+
+    sat_altitudes = [sat_min_altitude + 75*i*u.km for i in range(sat_planes_number)]
+    sat_distribution = [sat_number for i in range(sat_planes_number)]
+
     debris_orbits, diameters = generate_debris(use_new_dataset, total_debris)
-    sat_orbits, positions_satellites = generate_satellites(sat_planes_number, sat_number, sat_min_altitude, sat_inclination, sat_raan_spacing, sat_theta_spacing, initialize_random_anomalies)
+    #sat_orbits, positions_satellites = generate_satellites_old(sat_planes_number, sat_number, sat_min_altitude, sat_inclination, sat_raan_spacing, sat_theta_spacing, initialize_random_anomalies)
+
+    test_constellation = Constellation(sat_altitudes, sat_distribution, sat_inclination, sat_raan_spacing, sat_argument_periapsis)
+    test_constellation.generate_satellites()
+    #generate_satellites(sat_altitudes, sat_distribution, sat_inclination, sat_raan_spacing, 0*u.deg)
     start_stopwatch = time.time()
-    det_deb, position_deb, position_sat = simulation_loop(time_of_flight, time_step, start_time, debris_orbits, sat_orbits, total_debris, total_sats, max_range, FOV, diameters)
+    det_deb, position_deb, position_sat = simulation_loop(time_of_flight, time_step, start_time, debris_orbits, test_constellation.sat_orbits, total_debris, test_constellation.total_sats, max_range, FOV, diameters)
     end_stopwatch = time.time()
     elapsed_time = end_stopwatch - start_stopwatch
     print(f"Elapsed time: {elapsed_time:.2f} s")
-    #plot_simulation_results(det_deb, position_deb)
-    constellation_efficiency = len(det_deb)/total_debris
+    plot_simulation_results(det_deb, position_deb)
+    #constellation_efficiency = len(det_deb)/total_debris
 
 
 
