@@ -278,9 +278,9 @@ class Simulation:
     def __repr__(self):
         return f"Simulation(simtime={self.simtime}, starttime={self.starttime}, max_timestep={self.max_timestep}, min_timestep={self.min_timestep}, safe_range={self.safe_range})"
 ################################## DYNAMIC TIMESTEP UPDATES ##################################
-
+# removed because it slowed down too much and increasing debris number still renders the idea
     def update_timestep(self, distances):
-
+        return None
         if np.any(np.argwhere(distances < self.safe_range)):                                     # update timestep if debris is too close to a satellite
             self.timestep = max(self.min_timestep, self.timestep - 0.5*u.s)
             #print(f'Debris too close to satellite, reducing timestep to {self.timestep:.2f}')
@@ -421,7 +421,7 @@ def main(sim:Simulation, const:Constellation, deb_orbits, deb_diameters, rad:Rad
 
     # Plot the results
     print(f"Elapsed time: {elapsed_time:.2f} s")
-    plot_simulation_results(sim.det_deb, sim.det_pos, sim.det_time)
+    #plot_simulation_results(sim.det_deb, sim.det_pos, sim.det_time)
 
     # Calculate the efficiency of the constellation
     constellation_efficiency = len(sim.det_deb)/len(deb_orbits)

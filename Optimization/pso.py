@@ -1,6 +1,7 @@
 from simulation import Simulation, Constellation, Radar, main, generate_debris
 import numpy as np
 from astropy import units as u
+import gc
 
 # PSO Hyperparameters
 num_particles = 5
@@ -42,14 +43,15 @@ velocities_alt = np.random.uniform(low=-5, high=5, size=(int(num_particles), int
 velocities_dist  = np.random.randint(low=-2, high=2, size=(int(num_particles), int(num_planes)))           
 positions = np.concatenate((positions_alt, positions_dist), axis=1)
 velocities = np.concatenate((velocities_alt, velocities_dist), axis=1)
-constellations = [Constellation(altitudes*u.km, distribution, raan_spacing) for altitudes, distribution in zip(positions_alt, positions_dist)]
-print(constellations)
+
 personal_best_positions = np.copy(positions)
 personal_best_scores = np.array([])
-for constellation in constellations:
+for altitudes, distribution in zip(positions_alt, positions_dist):
 
+    constellation = Constellation(altitudes*u.km, distribution, raan_spacing)
     constellation_efficiency = main(sim, constellation, deb_orbits, deb_diameters, radar)
     personal_best_scores = np.append(personal_best_scores,constellation_efficiency)
+    gc.collect()
 
 global_best_score = np.max(personal_best_scores)
 global_best_position = np.copy(personal_best_positions[np.argmax(personal_best_scores)])
@@ -57,5 +59,32 @@ global_best_position = np.copy(personal_best_positions[np.argmax(personal_best_s
 
 print(personal_best_positions)
 print(personal_best_scores)
+print(global_best_score)
+print(global_best_position)
+
+
+# pso main loop
+
+for i in range(num_iterations):
+    for j in range(num_particles):
+        for k in range(dim):
+            r1 = np.random.rand()
+            r2 = np.random.rand()
+            velocities[j,k] = 0.5*velocities[j,k] + 1.5*r1*(personal_best_positions[j,k] - positions[j,k]) + 1.5*r2*(global_best_position[k] - positions[j,k])
+            positions[j,k] = positions[j,k] + velocities[j,k]
+
+        altitudes = positions[j,:num_planes]
+        distribution = positions[j,num_planes:]
+        constellation = Constellation(altitudes*u.km, distribution, raan_spacing)
+        constellation_efficiency = main(sim, constellation, deb_orbits, deb_diameters, radar)
+        if constellation_efficiency > personal_best_scores[j]:
+            personal_best_scores[j] = constellation_efficiency
+            personal_best_positions[j] = positions[j]
+        if constellation_efficiency > global_best_score:
+            global_best_score = constellation_efficiency
+            global_best_position = positions[j]
+        gc.collect()
+    print(f"Iteration {i+1}/{num_iterations} done")
+
 print(global_best_score)
 print(global_best_position)
