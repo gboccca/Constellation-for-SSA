@@ -154,7 +154,7 @@ def generate_debris(total_debris, use_new_dataset):
 
 class Constellation:
 
-    def __init__(self, altitudes:list, sat_distribution:list, raan_spacing, inclination=90*u.deg, argument_periapsis=0*u.deg, eccentricity = 0):
+    def __init__(self, altitudes, sat_distribution, raan_spacing, inclination=90*u.deg, argument_periapsis=0*u.deg, eccentricity = 0):
         self.altitudes = altitudes
         self.sat_distribution = sat_distribution
         self.inclination = inclination
@@ -163,7 +163,8 @@ class Constellation:
         self.eccentricity = eccentricity
         self.total_sats = sum(sat_distribution)
 
-
+    def __repr__(self):
+        return f"Constellation(altitudes={self.altitudes}, sat_distribution={self.sat_distribution}, inclination={self.inclination}, raan_spacing={self.raan_spacing}, argument_periapsis={self.argument_periapsis}, eccentricity={self.eccentricity})"
     def generate_satellites(self):
         """
         Generate a constellation of satellites in a given number of planes with a given number of satellites per plane.
@@ -185,7 +186,7 @@ class Constellation:
 
         for i in range(num_planes):
             altitude = self.altitudes[i]                 # Altitude of the current plane
-            num_sats = sat_distribution[i]          # Number of satellites in the current plane
+            num_sats = self.sat_distribution[i]          # Number of satellites in the current plane
             theta_spacing = 360/num_sats * u.deg    # Spacing between satellites in the plane (equally spaced)
             theta_offset = 360*i*u.deg/num_planes   # Offset per orbit to distribute satellites evenly in the constellation
             raan = i * self.raan_spacing                 # RAAN for the current plane
@@ -274,14 +275,15 @@ class Simulation:
         self.det_pos = None
         self.det_time = None
         
-
+    def __repr__(self):
+        return f"Simulation(simtime={self.simtime}, starttime={self.starttime}, max_timestep={self.max_timestep}, min_timestep={self.min_timestep}, safe_range={self.safe_range})"
 ################################## DYNAMIC TIMESTEP UPDATES ##################################
 
     def update_timestep(self, distances):
 
         if np.any(np.argwhere(distances < self.safe_range)):                                     # update timestep if debris is too close to a satellite
-            self.timestep = max(self.min_timestep, self.timestep - 0.1*u.s)
-            #print('Debris too close to satellite, reducing timestep to ', timestep)
+            self.timestep = max(self.min_timestep, self.timestep - 0.5*u.s)
+            #print(f'Debris too close to satellite, reducing timestep to {self.timestep:.2f}')
 
         else: 
             self.timestep = self.max_timestep
@@ -325,7 +327,8 @@ class Simulation:
     def simulation_loop(self, debris_orbits, total_debris, constellation:Constellation, radar:Radar, diameters, ex_pf=ex_pf,):
         
 
-        t = self.starttime
+        t = 0
+        self.timestep = self.max_timestep
         self.position_deb = np.zeros((total_debris, 3))                     # debris positions in cartesian coordinates
         self.position_sat = np.zeros((constellation.total_sats, 3))         # satellite positions in cartesian coordinates
         #v_debs = np.zeros((total_debris, 3))
@@ -352,7 +355,6 @@ class Simulation:
 
         self.det_deb = np.unique(self.det_deb)
         self.det_deb = self.det_deb.astype(int)
-
     
 ################################## PLOTTING RESULTS ##################################
 
@@ -393,15 +395,15 @@ def plot_simulation_results(det_deb, position_deb, det_time):
 
 
 
-def main(sim:Simulation, const:Constellation, deb_number, use_new_dataset, rad:Radar):
+def main(sim:Simulation, const:Constellation, deb_orbits, deb_diameters, rad:Radar):
     """
     This function runs the simulation of the input constellation and returns the efficiency of the constellation in detecting debris.
 
     Args:
         sim (Simulation): Simulation object.
         const (Constellation): Constellation object.
-        deb_number (int): Number of debris particles to simulate.
-        use_new_dataset (bool): Set to True to use the test dataset, False to use the MASTER-2009 model.
+        deb_orbits (list): List of Orbit objects representing the debris orbits.
+        deb_diameters (list): List of diameters of the debris particles.
         rad (Radar): Radar object.
 
     Returns:
@@ -409,12 +411,11 @@ def main(sim:Simulation, const:Constellation, deb_number, use_new_dataset, rad:R
     """
 
     # Obtain Orbit objects for the debris and the satellites
-    test_constellation.generate_satellites()
-    debris_orbits, diameters = generate_debris(deb_number, use_new_dataset)
+    const.generate_satellites()
     
     # Run the simulation
     start_stopwatch = time.time()
-    sim.simulation_loop(debris_orbits, deb_number, const, rad, diameters)
+    sim.simulation_loop(deb_orbits, len(deb_orbits), const, rad, deb_diameters)
     end_stopwatch = time.time()
     elapsed_time = end_stopwatch - start_stopwatch
 
@@ -423,7 +424,7 @@ def main(sim:Simulation, const:Constellation, deb_number, use_new_dataset, rad:R
     plot_simulation_results(sim.det_deb, sim.det_pos, sim.det_time)
 
     # Calculate the efficiency of the constellation
-    constellation_efficiency = len(sim.det_deb)/deb_number
+    constellation_efficiency = len(sim.det_deb)/len(deb_orbits)
 
     return constellation_efficiency
 
@@ -437,20 +438,16 @@ if __name__ == "__main__":
     #### Simulation 
     time_of_flight = 0.1 * u.hour
     start_time = 0*u.s      # Start time of the simulation
-    test_sim = Simulation (time_of_flight, start_time)
+    test_sim = Simulation (time_of_flight, start_time, min_timestep=1.0*u.s)
 
     #### Constellation 
     sat_planes_number = 13             # Number of orbital planes for the satellites
     sat_number = 40         # Number of satellites per plane
     sat_min_altitude = 450 * u.km       # Altitude of the lowest satellite orbit
-    sat_inclination = 90 * u.deg
     sat_raan_spacing = (360 / sat_planes_number)*u.deg  # Right Ascension of the Ascending Node (RAAN) spacing
-    sat_theta_spacing = (360 / sat_number)*u.deg  # True anomaly spacing
-    sat_argument_periapsis = 0*u.deg
-    
     sat_altitudes = [sat_min_altitude + 75*i*u.km for i in range(sat_planes_number)]
     sat_distribution = [sat_number for i in range(sat_planes_number)]
-    test_constellation = Constellation(sat_altitudes, sat_distribution, sat_raan_spacing, sat_inclination, sat_argument_periapsis)
+    test_constellation = Constellation(sat_altitudes, sat_distribution, sat_raan_spacing)
 
     #### Debris 
     use_new_dataset = False  # Set to False to use the test dataset, True to use the MASTER-2009 model
@@ -461,8 +458,6 @@ if __name__ == "__main__":
     radar = Radar()
 
     # Code execution
-    constellation_efficiency = main(test_sim, test_constellation, total_debris, use_new_dataset, radar)
+    debris_orbits, debris_diameters = generate_debris(total_debris, use_new_dataset)
+    constellation_efficiency = main(test_sim, test_constellation, debris_orbits, debris_diameters, radar)
     print(f"Constellation efficiency: {constellation_efficiency:.2f}")
-
-
-
