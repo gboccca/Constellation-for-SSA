@@ -154,14 +154,18 @@ def generate_debris(total_debris, use_new_dataset):
 
 class Constellation:
 
-    def __init__(self, altitudes, sat_distribution, raan_spacing, inclination=90*u.deg, argument_periapsis=0*u.deg, eccentricity = 0):
-        self.altitudes = altitudes
-        self.sat_distribution = sat_distribution
-        self.inclination = inclination
-        self.raan_spacing = raan_spacing
-        self.argument_periapsis = argument_periapsis
-        self.eccentricity = eccentricity
-        self.total_sats = sum(sat_distribution)
+    def __init__(self, **kwargs):
+
+        self.altitudes = kwargs.get("altitudes")*u.km
+        self.sat_distribution = kwargs.get("sat_distribution")
+        self.inclination = kwargs.get("inclination", 90)*u.deg
+        self.raan_spacing = kwargs.get("raan_spacing", 360/len(self.altitudes))*u.deg
+        self.argument_periapsis = kwargs.get("argument_periapsis", 0)*u.deg
+        self.eccentricity = kwargs.get("eccentricity", 0)
+        self.total_sats = sum(self.sat_distribution)
+        if type(self.altitudes) == None or type(self.sat_distribution) == None:
+            raise ValueError("Constellation: Altitudes and satellite distribution must be provided.")
+        
 
     def __repr__(self):
         return f"Constellation(altitudes={self.altitudes}, sat_distribution={self.sat_distribution}, inclination={self.inclination}, raan_spacing={self.raan_spacing}, argument_periapsis={self.argument_periapsis}, eccentricity={self.eccentricity})"
@@ -186,7 +190,7 @@ class Constellation:
 
         for i in range(num_planes):
             altitude = self.altitudes[i]                 # Altitude of the current plane
-            num_sats = self.sat_distribution[i]          # Number of satellites in the current plane
+            num_sats = int(self.sat_distribution[i])          # Number of satellites in the current plane
             theta_spacing = 360/num_sats * u.deg    # Spacing between satellites in the plane (equally spaced)
             theta_offset = 360*i*u.deg/num_planes   # Offset per orbit to distribute satellites evenly in the constellation
             raan = i * self.raan_spacing                 # RAAN for the current plane
@@ -318,7 +322,7 @@ class Simulation:
         normproducts = np.linalg.norm(position_sat, axis=1)*distances                       # product of norms of relative and satellite positions. shape: (total_debris, total_sats)
         angles = np.arccos(dotproducts/normproducts) * (180 / np.pi)                        # angles between debris and satellites. shape: (total_debris, total_sats)
 
-        self.update_timestep(distances)  
+        self.update_timestep(distances)  # not actually doing anything, timstep is constant 
             
         debris_in_FOV = np.argwhere((distances < radar.max_range) & (angles < radar.FOV))               # row indices of debris in FOV
         debris_in_FOV = np.unique(debris_in_FOV[:, 0])
@@ -447,7 +451,7 @@ if __name__ == "__main__":
     sat_raan_spacing = (360 / sat_planes_number)*u.deg  # Right Ascension of the Ascending Node (RAAN) spacing
     sat_altitudes = [sat_min_altitude + 75*i*u.km for i in range(sat_planes_number)]
     sat_distribution = [sat_number for i in range(sat_planes_number)]
-    test_constellation = Constellation(sat_altitudes, sat_distribution, sat_raan_spacing)
+    test_constellation = Constellation(altitudes=sat_altitudes, sat_distribution=sat_distribution, raan_spacing=sat_raan_spacing)
 
     #### Debris 
     use_new_dataset = False  # Set to False to use the test dataset, True to use the MASTER-2009 model
