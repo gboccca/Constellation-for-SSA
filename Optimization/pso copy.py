@@ -192,6 +192,7 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
     gbest_eff = 0
 
     # first evaluation of the particles
+    print('Starting first evaluation')
     for p in range(n_particles):
         positions_dict = {opt_pars[n]:positions[n,p] for n in range(dim)}
         satdist, altitudes = call_function_with_kwargs(satellite_dist, parameters, positions_dict, num_obrits=n_orbits, num_sats=n_sats)
@@ -218,24 +219,28 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
 
 
     # pso loop
+    print('Starting PSO loop')
     for i in range(n_iterations):
-        print('Iteration:', i)
+        print('Iteration:', i+1)
         i_start_time = time.time()
 
         # update velocity and position of all particles - there should be no problem with particles going out of range
         cognitive_component = cognitive*np.random.rand()*(pbest-positions)
         social_component = social*np.random.rand()*(gbest-positions)
         velocities = velocities*inertia + cognitive_component + social_component
-
+        print(f'Velocities in iteration {i}, before scaling:'); print(velocities)
         # scale velocities so that the maximum velocity change is upper_bound - lower_bound. 
         # this will solve the scaling/excessive velocity problem but will make it such that the fastest particle always oscillates between the bounds
+        # update: this dont solve shit, need to figure out the fucking velocities holy fuck
         for d in range(dim):
-            velocities[d] *= (upper_bound[d] - lower_bound[d]) / np.max(velocities[d])
+            velocities[d] *= (upper_bound[d] - lower_bound[d]) / np.max(np.abs(velocities[d]))
 
         # print('Velocities before:'); print(velocities)
         # print('Positions before:'); print(positions)
-
+        
+        print(f'Velocities in iteration {i}, after scaling:'); print(velocities)
         positions += velocities
+        print(f'Positions in iteration {i}:'); print(positions)
         
         # implement reflection on the boundaries and reflect velocity: problem: if a velocity is too high, it is reflected out of the other bound
         for d in range(dim):
@@ -246,6 +251,7 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
                 elif positions[d, j] > upper_bound[d]:
                     positions[d, j] = 2*upper_bound[d] - positions[d, j]
                     velocities[d, j] = -velocities[d, j]
+        print(f'Positions in iteration {i}, boundary condition applied:'); print(positions)
 
         # same but with np broadcasting:
         #positions = np.where(positions < lower_bound, 2*lower_bound - positions, positions)
@@ -258,8 +264,9 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
 
         
         for p in range(n_particles):
+
             positions_dict = {opt_pars[n]:positions[n,p] for n in range(dim)}
-            #print('Positions dict:'); print(positions_dict)
+            print('Positions dict:'); print(positions_dict)
             satdist, altitudes = call_function_with_kwargs(satellite_dist, parameters, positions_dict, num_obrits=n_orbits, num_sats=n_sats)
             const = call_function_with_kwargs(Constellation, parameters, positions_dict, sat_distribution=satdist, altitudes=altitudes)
             print(const)
@@ -324,7 +331,7 @@ if __name__ == '__main__':
     inertia = 0.5   
     cognitive = 0.5
     social = 0.5
-    n_particles = 5
+    n_particles = 2
     n_iterations = 20
 
     # Simulation parameters (constant)
@@ -332,7 +339,7 @@ if __name__ == '__main__':
     start_time = 0*u.s      # Start time of the simulation
     sim = Simulation (time_of_flight, start_time)
     radar = Radar()
-    deb_number = 200
+    deb_number = 100
     use_new_dataset = False
     deb_orbits, deb_diameters = generate_debris(deb_number, use_new_dataset)
 
