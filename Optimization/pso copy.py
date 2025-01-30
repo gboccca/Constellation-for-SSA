@@ -229,11 +229,15 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
         social_component = social*np.random.rand()*(gbest-positions)
         velocities = velocities*inertia + cognitive_component + social_component
         print(f'Velocities in iteration {i}, before scaling:'); print(velocities)
-        # scale velocities so that the maximum velocity change is upper_bound - lower_bound. 
+        # scale velocities in each dimension so that the maximum velocity change is upper_bound - lower_bound in that dimension
         # this will solve the scaling/excessive velocity problem but will make it such that the fastest particle always oscillates between the bounds
         # update: this dont solve shit, need to figure out the fucking velocities holy fuck
+        #update: i added that abs() and now it seems to not run into any problems
+        # update: only apply scaling if one velocity exceeds the maximum. done to 
+
         for d in range(dim):
-            velocities[d] *= (upper_bound[d] - lower_bound[d]) / np.max(np.abs(velocities[d]))
+            if np.max(np.abs(velocities[d])) > upper_bound[d] - lower_bound[d]:
+                velocities[d] *= (upper_bound[d] - lower_bound[d]) / np.max(np.abs(velocities[d]))
 
         # print('Velocities before:'); print(velocities)
         # print('Positions before:'); print(positions)
@@ -273,12 +277,15 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
             consteff = main(sim, const, deb_orbits, deb_diameters, radar, plot=False, simid=f'{i+1}.{p}')
             
             # update personal best - there is a broadcasting bug here
-            pbest[:,p] = positions[:,p]
-            pbest_eff[0,p] = consteff
+            if consteff > pbest_eff[0,p]:
+                pbest[:,p] = positions[:,p]
+                pbest_eff[0,p] = consteff
 
         # update global best position and value
-        gbest_eff = np.max(pbest_eff)
-        gbest[:,0] = pbest[:,np.argmax(pbest_eff)]
+        if np.max(pbest_eff) > gbest_eff:
+            gbest_eff = np.max(pbest_eff)
+            gbest[:,0] = pbest[:,np.argmax(pbest_eff)]
+
             
         # update history
         pso_history[p,i,:] = [const, consteff]
