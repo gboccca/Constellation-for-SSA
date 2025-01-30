@@ -269,14 +269,16 @@ class Radar:
 
 class Simulation:
 
-    def __init__(self, simtime, starttime, max_timestep=10.0*u.s, min_timestep=0.5*u.s, safe_range=200):
+    def __init__(self, simtime, starttime, max_timestep=10.0*u.s, min_timestep=0.5*u.s, safe_range=200, collision_range=1):
         self.simtime = simtime
         self.starttime = starttime
         self.max_timestep = max_timestep
         self.min_timestep = min_timestep
         self.safe_range = safe_range
+        self.collision_range = collision_range
         self.timestep = max_timestep
         self.det_deb = None
+        self.col_deb = None
         self.position_deb = None
         self.position_sat = None
         self.det_pos = None
@@ -298,7 +300,6 @@ class Simulation:
 
 
 ################################## DETECTION ALGORITHM ##################################
-
 
     def detect_debris2(self, position_sat, position_deb, radar:Radar):
 
@@ -326,10 +327,12 @@ class Simulation:
         angles = np.arccos(dotproducts/normproducts) * (180 / np.pi)                        # angles between debris and satellites. shape: (total_debris, total_sats)
 
         self.update_timestep(distances)  # not actually doing anything, timstep is constant 
-            
+        
+        debris_in_collision = np.argwhere(distances < self.collision_range)                       # row indices of debris in collision
+        debris_in_collision = np.unique(debris_in_collision[:, 0])
         debris_in_FOV = np.argwhere((distances < radar.max_range) & (angles < radar.FOV))               # row indices of debris in FOV
         debris_in_FOV = np.unique(debris_in_FOV[:, 0])
-        return debris_in_FOV    
+        return debris_in_FOV, debris_in_collision
 
     def simulation_loop(self, debris_orbits, total_debris, constellation:Constellation, radar:Radar, diameters, ex_pf=ex_pf,):
         
@@ -340,6 +343,7 @@ class Simulation:
         self.position_sat = np.zeros((constellation.total_sats, 3))         # satellite positions in cartesian coordinates
         #v_debs = np.zeros((total_debris, 3))
         self.det_deb = []
+        self.col_deb = []
         self.det_pos = np.zeros((total_debris, 3))
         self.det_time = np.zeros(total_debris)
 
@@ -354,14 +358,17 @@ class Simulation:
             self.position_sat = propagate_all_orbits(constellation.sat_orbits, self.position_sat, t)
 
             # Apply detection algorithm
-            debris_in_FOV=self.detect_debris2(self.position_sat, self.position_deb, radar)
+            debris_in_FOV, debris_in_collision=self.detect_debris2(self.position_sat, self.position_deb, radar)
             self.det_deb = np.append(self.det_deb, debris_in_FOV)
             self.det_pos[debris_in_FOV] = self.position_deb[debris_in_FOV]
             self.det_time[debris_in_FOV] = t
+            self.col_deb = np.append(self.col_deb, debris_in_collision)
 
 
         self.det_deb = np.unique(self.det_deb)
         self.det_deb = self.det_deb.astype(int)
+        self.col_deb = np.unique(self.col_deb)
+        self.col_deb = self.col_deb.astype(int)
     
 ################################## PLOTTING RESULTS ##################################
 
@@ -416,24 +423,28 @@ def main(sim:Simulation, const:Constellation, deb_orbits, deb_diameters, rad:Rad
     Returns:
         float: Efficiency of the constellation in detecting debris.
     """
+    total_debris = len(deb_orbits)
 
     # Obtain Orbit objects for the debris and the satellites
     const.generate_satellites()
     
     # Run the simulation
     start_stopwatch = time.time()
-    sim.simulation_loop(deb_orbits, len(deb_orbits), const, rad, deb_diameters)
+    sim.simulation_loop(deb_orbits, total_debris, const, rad, deb_diameters)
     end_stopwatch = time.time()
     elapsed_time = end_stopwatch - start_stopwatch
 
-    # Plot the results
-    print(f"Elapsed time for simulation {simid}: {elapsed_time:.2f} s")
     if plot:
         plot_simulation_results(sim.det_deb, sim.det_pos, sim.det_time)
 
     # Calculate the efficiency of the constellation
-    constellation_efficiency = len(sim.det_deb)/len(deb_orbits)
+    collision_penalty = len(sim.col_deb)/len(deb_orbits)
+    constellation_efficiency = len(sim.det_deb)/len(deb_orbits) * (1 - collision_penalty)
 
+
+    # Plot the results
+    print(f"Elapsed time for simulation {simid}: {elapsed_time:.2f} s")
+    print(f'Detected debris: {sim.det_deb}. Efficiency: {constellation_efficiency}. Collisions: {sim.col_deb}. Collision penalty: {collision_penalty}/1')
     return constellation_efficiency
 
 
@@ -450,16 +461,16 @@ if __name__ == "__main__":
 
     #### Constellation 
     sat_planes_number = 13             # Number of orbital planes for the satellites
-    sat_number = 40         # Number of satellites per plane
-    sat_min_altitude = 450 * u.km       # Altitude of the lowest satellite orbit
-    sat_raan_spacing = (360 / sat_planes_number)*u.deg  # Right Ascension of the Ascending Node (RAAN) spacing
-    sat_altitudes = [sat_min_altitude + 75*i*u.km for i in range(sat_planes_number)]
+    sat_number = 60         # Number of satellites per plane
+    sat_min_altitude = 450       # Altitude of the lowest satellite orbit
+    sat_raan_spacing = (360 / sat_planes_number)  # Right Ascension of the Ascending Node (RAAN) spacing
+    sat_altitudes = [sat_min_altitude + 75*i for i in range(sat_planes_number)]
     sat_distribution = [sat_number for i in range(sat_planes_number)]
     test_constellation = Constellation(altitudes=sat_altitudes, sat_distribution=sat_distribution, raan_spacing=sat_raan_spacing)
 
     #### Debris 
     use_new_dataset = False  # Set to False to use the test dataset, True to use the MASTER-2009 model
-    total_debris = 100  # Number of debris particles to simulate. if not using the test dataset, can be arbitrarily chosen. 
+    total_debris = 1000  # Number of debris particles to simulate. if not using the test dataset, can be arbitrarily chosen. 
                             # if using the test dataset, must be one of the following: 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000
 
     #### Radar
