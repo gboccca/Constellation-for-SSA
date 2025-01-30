@@ -12,6 +12,8 @@ import random
 import csv
 import time
 from generic_tools import format_time
+import warnings
+warnings.simplefilter("ignore", category=UserWarning)
 
 ################################## INPUTS ##################################
 
@@ -60,7 +62,7 @@ def generate_debris(total_debris, use_new_dataset):
                 for key in row:
                     dataset[key].append(row[key])  # Append each value to the corresponding list
 
-        print(f"Dictionary reconstructed from '{filename}':")
+        print(f"Dictionary reconstructed from '{filename}'")
         
 
 
@@ -165,6 +167,7 @@ class Constellation:
         self.total_sats = sum(self.sat_distribution)
         if type(self.altitudes) == None or type(self.sat_distribution) == None:
             raise ValueError("Constellation: Altitudes and satellite distribution must be provided.")
+        self.asdict = {"altitudes": self.altitudes, "sat_distribution": self.sat_distribution, "inclination": self.inclination, "raan_spacing": self.raan_spacing, "argument_periapsis": self.argument_periapsis, "eccentricity": self.eccentricity, "total_sats": self.total_sats}
         
 
     def __repr__(self):
@@ -399,7 +402,7 @@ def plot_simulation_results(det_deb, position_deb, det_time):
 
 
 
-def main(sim:Simulation, const:Constellation, deb_orbits, deb_diameters, rad:Radar):
+def main(sim:Simulation, const:Constellation, deb_orbits, deb_diameters, rad:Radar, plot:bool=True, simid='test'):
     """
     This function runs the simulation of the input constellation and returns the efficiency of the constellation in detecting debris.
 
@@ -424,8 +427,9 @@ def main(sim:Simulation, const:Constellation, deb_orbits, deb_diameters, rad:Rad
     elapsed_time = end_stopwatch - start_stopwatch
 
     # Plot the results
-    print(f"Elapsed time: {elapsed_time:.2f} s")
-    #plot_simulation_results(sim.det_deb, sim.det_pos, sim.det_time)
+    print(f"Elapsed time for simulation {simid}: {elapsed_time:.2f} s")
+    if plot:
+        plot_simulation_results(sim.det_deb, sim.det_pos, sim.det_time)
 
     # Calculate the efficiency of the constellation
     constellation_efficiency = len(sim.det_deb)/len(deb_orbits)
