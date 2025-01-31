@@ -155,23 +155,33 @@ def generate_debris(total_debris, use_new_dataset):
 
 
 class Constellation:
+    
+    keys = ["altitudes", "sat_distribution", "inclination", "raan_spacing", "argument_periapsis", "eccentricity"] # class variable
 
     def __init__(self, **kwargs):
 
-        self.altitudes = kwargs.get("altitudes")*u.km
+        self.altitudes = kwargs.get("altitudes")
         self.sat_distribution = kwargs.get("sat_distribution")
-        self.inclination = kwargs.get("inclination", 90)*u.deg
-        self.raan_spacing = kwargs.get("raan_spacing", 360/len(self.altitudes))*u.deg
-        self.argument_periapsis = kwargs.get("argument_periapsis", 0)*u.deg
+        self.inclination = kwargs.get("inclination", 90)
+        self.raan_spacing = kwargs.get("raan_spacing", 360/len(self.altitudes))
+        self.argument_periapsis = kwargs.get("argument_periapsis", 0)
         self.eccentricity = kwargs.get("eccentricity", 0)
         self.total_sats = sum(self.sat_distribution)
         if type(self.altitudes) == None or type(self.sat_distribution) == None:
             raise ValueError("Constellation: Altitudes and satellite distribution must be provided.")
         self.asdict = {"altitudes": self.altitudes, "sat_distribution": self.sat_distribution, "inclination": self.inclination, "raan_spacing": self.raan_spacing, "argument_periapsis": self.argument_periapsis, "eccentricity": self.eccentricity, "total_sats": self.total_sats}
-        
+        self.asarray = [self.altitudes, self.sat_distribution, self.inclination, self.raan_spacing, self.argument_periapsis, self.eccentricity]
+
+        self.altitudes *= u.km
+        self.inclination *= u.deg
+        self.raan_spacing *= u.deg
+        self.argument_periapsis *= u.deg
+
+
 
     def __repr__(self):
-        return f"Constellation(altitudes={self.altitudes}, sat_distribution={self.sat_distribution}, inclination={self.inclination}, raan_spacing={self.raan_spacing}, argument_periapsis={self.argument_periapsis}, eccentricity={self.eccentricity})"
+        return f"Constellation:\n (altitudes={self.altitudes}\n sat_distribution={self.sat_distribution}\n inclination={self.inclination}\n raan_spacing={self.raan_spacing}\n argument_periapsis={self.argument_periapsis}\n eccentricity={self.eccentricity})"
+    
     def generate_satellites(self):
         """
         Generate a constellation of satellites in a given number of planes with a given number of satellites per plane.

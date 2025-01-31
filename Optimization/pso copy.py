@@ -191,6 +191,11 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
     gbest = np.zeros((dim,1))
     gbest_eff = 0
 
+    # initialize history
+    pso_history = np.zeros((n_particles, n_iterations, 2), dtype=object) 
+    gbest_history = np.zeros((n_iterations))
+
+
     # first evaluation of the particles
     print('Starting first evaluation')
     for p in range(n_particles):
@@ -202,20 +207,21 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
         pbest[:,p] = positions[:,p]
         pbest_eff[0,p] = consteff
 
+        pso_history[p,0,:] = [consteff, const]
+
+
     # initialize global best position and value
     gbest_eff = np.max(pbest_eff)
     gbest[:,0] = pbest[:,np.argmax(pbest_eff)]
 
     # initialize history
-    pso_history = np.zeros((n_particles, n_iterations, 2), dtype=object)
-
     # debugging prints
-    print('Initial positions:'); print(positions)
-    print('Initial velocities:'); print(velocities)
-    print('Initial pbest:'); print(pbest)
-    print('Initial pbest_eff:'); print(pbest_eff)
-    print('Initial gbest:'); print(gbest)
-    print('Initial gbest_eff:'); print(gbest_eff)
+    # print('Initial positions:'); print(positions)
+    # print('Initial velocities:'); print(velocities)
+    # print('Initial pbest:'); print(pbest)
+    # print('Initial pbest_eff:'); print(pbest_eff)
+    # print('Initial gbest:'); print(gbest)
+    # print('Initial gbest_eff:'); print(gbest_eff)
 
 
     # pso loop
@@ -228,7 +234,7 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
         cognitive_component = cognitive*np.random.rand()*(pbest-positions)
         social_component = social*np.random.rand()*(gbest-positions)
         velocities = velocities*inertia + cognitive_component + social_component
-        print(f'Velocities in iteration {i}, before scaling:'); print(velocities)
+        # print(f'Velocities in iteration {i}, before scaling:'); print(velocities)
         # scale velocities in each dimension so that the maximum velocity change is upper_bound - lower_bound in that dimension
         # this will solve the scaling/excessive velocity problem but will make it such that the fastest particle always oscillates between the bounds
         # update: this dont solve shit, need to figure out the fucking velocities holy fuck
@@ -242,9 +248,9 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
         # print('Velocities before:'); print(velocities)
         # print('Positions before:'); print(positions)
         
-        print(f'Velocities in iteration {i}, after scaling:'); print(velocities)
+        # print(f'Velocities in iteration {i}, after scaling:'); print(velocities)
         positions += velocities
-        print(f'Positions in iteration {i}:'); print(positions)
+        # print(f'Positions in iteration {i}:'); print(positions)
         
         # implement reflection on the boundaries and reflect velocity: problem: if a velocity is too high, it is reflected out of the other bound
         for d in range(dim):
@@ -255,7 +261,7 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
                 elif positions[d, j] > upper_bound[d]:
                     positions[d, j] = 2*upper_bound[d] - positions[d, j]
                     velocities[d, j] = -velocities[d, j]
-        print(f'Positions in iteration {i}, boundary condition applied:'); print(positions)
+        # print(f'Positions in iteration {i}, boundary condition applied:'); print(positions)
 
         # same but with np broadcasting:
         #positions = np.where(positions < lower_bound, 2*lower_bound - positions, positions)
@@ -270,10 +276,10 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
         for p in range(n_particles):
 
             positions_dict = {opt_pars[n]:positions[n,p] for n in range(dim)}
-            print('Positions dict:'); print(positions_dict)
+            # print('Positions dict:'); print(positions_dict)
             satdist, altitudes = call_function_with_kwargs(satellite_dist, parameters, positions_dict, num_obrits=n_orbits, num_sats=n_sats)
             const = call_function_with_kwargs(Constellation, parameters, positions_dict, sat_distribution=satdist, altitudes=altitudes)
-            print(const)
+            # print(const)
             consteff = main(sim, const, deb_orbits, deb_diameters, radar, plot=False, simid=f'{i+1}.{p}')
             
             # update personal best - there is a broadcasting bug here
@@ -281,22 +287,25 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
                 pbest[:,p] = positions[:,p]
                 pbest_eff[0,p] = consteff
 
+            # update history
+            pso_history[p,i,:] = [consteff, const]
+
         # update global best position and value
         if np.max(pbest_eff) > gbest_eff:
             gbest_eff = np.max(pbest_eff)
             gbest[:,0] = pbest[:,np.argmax(pbest_eff)]
 
             
-        # update history
-        pso_history[p,i,:] = [const, consteff]
 
+        
+        gbest_history[i] = gbest_eff
         i_end_time = time.time()
 
-        print(f'Iteration {i+1} completed in {i_end_time - i_start_time} seconds . Best value: {gbest_eff}')
+        print(f'Iteration {i+1} completed in {(i_end_time - i_start_time):.2f} seconds . Best value: {gbest_eff}')
 
-    return gbest, gbest_eff, pso_history
+    return gbest, gbest_eff, pso_history, gbest_history
 
-def save_pso_results(gbest, gbest_eff, pso_history, n_particles, n_iterations, opt_par, run_name):
+def save_pso_results(gbest, gbest_eff, pso_history, gbest_history, n_particles, n_iterations, opt_pars, run_name):
     """
     Save the results of the PSO optimization to a csv file
     """
@@ -316,19 +325,35 @@ def save_pso_results(gbest, gbest_eff, pso_history, n_particles, n_iterations, o
         writer.writerow(['Number of iterations:'])
         writer.writerow([n_iterations])
         writer.writerow(['Optimized parameters:'])
-        writer.writerow(opt_par)
+        writer.writerow(opt_pars)
         writer.writerow(['History:'])
         writer.writerows(pso_history)
 
     print(f"Results saved successfully to '{filename}'")
 
     # plot efficiency as a function of iteration
-    plt.scatter(range(n_iterations), pso_history[:,1])
+    plt.scatter(range(n_iterations), gbest_history)
     plt.xlabel('Iteration')
     plt.ylabel('Efficiency')
     plt.title('Efficiency as a function of iteration')
-    plt.savefig(f'Optimization/pso_results/{run_name}_efficiency.png')
+    plt.savefig(f'Optimization/pso_plots/{run_name}_eta_vs_i.png')
     plt.close()
+
+    # plot efficiency as a function of each opt_par
+    # print(pso_history)
+    # print(pso_history[1,:,1])
+    for par in opt_pars:
+        x = np.array([pso_history[j,i,1].asdict[par] for j in range(n_particles) for i in range(n_iterations)])
+        y = np.array([pso_history[j,i,0] for j in range(n_particles) for i in range(n_iterations)])
+        plt.scatter(x, y)
+        plt.xlabel(par)
+        plt.ylabel('Efficiency')
+        plt.title(f'Efficiency as a function of {par}')
+        plt.savefig(f'Optimization/pso_plots/{run_name}eta_vs_{par}.png')
+        plt.close()
+        
+    print(f'Plots saved successfully to "Optimization/pso_plots/"')
+        
 
 
 
@@ -339,10 +364,11 @@ if __name__ == '__main__':
     cognitive = 0.5
     social = 0.5
     n_particles = 2
-    n_iterations = 20
+    n_iterations = 5
+    run_name = input('Enter the name of the run: ')
 
     # Simulation parameters (constant)
-    time_of_flight = 0.1 * u.hour
+    time_of_flight = 0.01 * u.hour
     start_time = 0*u.s      # Start time of the simulation
     sim = Simulation (time_of_flight, start_time)
     radar = Radar()
@@ -359,7 +385,7 @@ if __name__ == '__main__':
 
     # Run PSO and save results
     pso_start_time = time.time()
-    gbest, gbest_eff, pso_history = pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia, cognitive, social)
+    gbest, gbest_eff, pso_history, gbest_history = pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia, cognitive, social)
     pso_end_time = time.time()
     print(f'PSO took {pso_end_time - pso_start_time} seconds to run {n_iterations} iterations with {n_particles} particles')
-    save_pso_results(gbest, gbest_eff, pso_history, n_particles, n_iterations, opt_pars, 'test_run')
+    save_pso_results(gbest, gbest_eff, pso_history, gbest_history, n_particles, n_iterations, opt_pars, run_name)
