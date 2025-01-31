@@ -7,6 +7,7 @@ from gaussian import doublegaussian_fit
 import csv
 import time
 from matplotlib import pyplot as plt
+import matplotlib.cm as cm
 
 
 
@@ -197,7 +198,7 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
 
 
     # first evaluation of the particles
-    print('Starting first evaluation')
+    print('\nStarting first evaluation (Iteration 0)')
     for p in range(n_particles):
         positions_dict = {opt_pars[n]:positions[n,p] for n in range(dim)}
         satdist, altitudes = call_function_with_kwargs(satellite_dist, parameters, positions_dict, num_obrits=n_orbits, num_sats=n_sats)
@@ -225,9 +226,9 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
 
 
     # pso loop
-    print('Starting PSO loop')
+    print('\nStarting PSO loop\n')
     for i in range(n_iterations):
-        print('Iteration:', i+1)
+        print('\nIteration:', i+1)
         i_start_time = time.time()
 
         # update velocity and position of all particles - there should be no problem with particles going out of range
@@ -309,7 +310,6 @@ def save_pso_results(gbest, gbest_eff, pso_history, gbest_history, n_particles, 
     """
     Save the results of the PSO optimization to a csv file
     """
-    
 
 
     filename = f'Optimization/pso_results/{run_name}.csv'
@@ -336,7 +336,7 @@ def save_pso_results(gbest, gbest_eff, pso_history, gbest_history, n_particles, 
     plt.xlabel('Iteration')
     plt.ylabel('Efficiency')
     plt.title('Efficiency as a function of iteration')
-    plt.savefig(f'Optimization/pso_plots/{run_name}_eta_vs_i.png')
+    plt.savefig(f'Optimization/pso_plots/{run_name}/eta_vs_i.png')
     plt.close()
 
     # plot efficiency as a function of each opt_par
@@ -349,9 +349,58 @@ def save_pso_results(gbest, gbest_eff, pso_history, gbest_history, n_particles, 
         plt.xlabel(par)
         plt.ylabel('Efficiency')
         plt.title(f'Efficiency as a function of {par}')
-        plt.savefig(f'Optimization/pso_plots/{run_name}eta_vs_{par}.png')
+        plt.savefig(f'Optimization/pso_plots/{run_name}/eta_vs_{par}.png')
         plt.close()
+
+
+    # generate 2d plots for each pair of parameters. efficiency is shown as the color of the points
+
+    if len(opt_pars) == 2:
+        x = np.array([pso_history[j, i, 1].asdict[opt_pars[0]] for j in range(n_particles) for i in range(n_iterations)])
+        y = np.array([pso_history[j, i, 1].asdict[opt_pars[1]] for j in range(n_particles) for i in range(n_iterations)])
+        z = np.array([pso_history[j, i, 0] for j in range(n_particles) for i in range(n_iterations)]) 
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Create scatter plot and store the mappable object
+        scatter = ax.scatter(x, y, c=z, cmap='viridis')
+
+        # Add colorbar and associate it with the scatter plot
+        cbar = fig.colorbar(scatter, ax=ax, shrink=0.6, aspect=20, pad=0.1)
+        cbar.set_label('Efficiency')
+
+        ax.set_xlabel(opt_pars[0])
+        ax.set_ylabel(opt_pars[1])
+        ax.set_title(f'Efficiency vs {opt_pars[0]} and {opt_pars[1]}')
+
+        plt.savefig(f'Optimization/pso_plots/{run_name}/eta_vs_{opt_pars[0]}_{opt_pars[1]}.png')
+        plt.close()
+
+
+    # same as before, but now its a 3d plot and the color is still the efficiency
+    if len(opt_pars) == 3:
+        x = np.array([pso_history[j,i,1].asdict[opt_pars[0]] for j in range(n_particles) for i in range(n_iterations)])
+        y = np.array([pso_history[j,i,1].asdict[opt_pars[1]] for j in range(n_particles) for i in range(n_iterations)])
+        z = np.array([pso_history[j,i,1].asdict[opt_pars[2]] for j in range(n_particles) for i in range(n_iterations)])
+        c = np.array([pso_history[j,i,0] for j in range(n_particles) for i in range(n_iterations)])
         
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        scatter = ax.scatter(x, y, z, c=c, cmap='viridis')
+
+        ax.set_xlabel(opt_pars[0])
+        ax.set_ylabel(opt_pars[1])
+        ax.set_zlabel(opt_pars[2])
+        ax.set_title(f'Efficiency vs {opt_pars[0]}, {opt_pars[1]} and {opt_pars[2]}')
+
+        cbar = fig.colorbar(scatter, ax=ax, shrink=0.6, aspect=20, pad=0.1)
+        cbar.set_label('Efficiency')
+
+        plt.savefig(f'Optimization/pso_plots/{run_name}/eta_vs_{opt_pars[0]}_{opt_pars[1]}_{opt_pars[2]}.png')
+        plt.close()
+    
     print(f'Plots saved successfully to "Optimization/pso_plots/"')
         
 
@@ -372,7 +421,7 @@ if __name__ == '__main__':
     start_time = 0*u.s      # Start time of the simulation
     sim = Simulation (time_of_flight, start_time)
     radar = Radar()
-    deb_number = 100
+    deb_number = 500
     use_new_dataset = False
     deb_orbits, deb_diameters = generate_debris(deb_number, use_new_dataset)
 

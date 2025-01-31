@@ -453,8 +453,8 @@ def main(sim:Simulation, const:Constellation, deb_orbits, deb_diameters, rad:Rad
 
 
     # Plot the results
-    print(f"Elapsed time for simulation {simid}: {elapsed_time:.2f} s")
-    print(f'Detected debris: {sim.det_deb}. Efficiency: {constellation_efficiency}. Collisions: {sim.col_deb}. Collision penalty: {collision_penalty}/1')
+    print(f"S{simid} completed. Elapsed time: {elapsed_time:.2f} s")
+    print(f'    - Detected debris: {sim.det_deb}. Efficiency: {constellation_efficiency}. Collisions: {sim.col_deb}. Collision penalty: {collision_penalty}/1')
     return constellation_efficiency
 
 

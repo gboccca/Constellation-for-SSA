@@ -1,5 +1,5 @@
 Best parameters:
-[48.68732931],[3.60718152],[0.50173079]
+[78.80520118],[28.57550911],[0.51359378]
 Best efficiency:
 0.0
 Number of particles:
@@ -15,89 +15,89 @@ History:
    927.27272727 1022.72727273 1118.18181818 1213.63636364 1309.09090909
   1404.54545455 1500.        ] km
   sat_distribution=[  8  13  31  81 106  66  35  30  30  29  27  24]
-  inclination=3.812206614808154 deg
-  raan_spacing=49.092539282616805 deg
+  inclination=28.656159240936198 deg
+  raan_spacing=79.16121235063183 deg
   argument_periapsis=0.0 deg
-  eccentricity=0.7986452906313313)                                                 ]","[0.0
+  eccentricity=0.847932022354469)                                                  ]","[0.0
  Constellation:
   (altitudes=[ 450.          545.45454545  640.90909091  736.36363636  831.81818182
    927.27272727 1022.72727273 1118.18181818 1213.63636364 1309.09090909
   1404.54545455 1500.        ] km
   sat_distribution=[  8  13  31  81 106  66  35  30  30  29  27  24]
-  inclination=3.7816781216111472 deg
-  raan_spacing=49.032203011184684 deg
+  inclination=28.672041995870277 deg
+  raan_spacing=79.23132306637564 deg
   argument_periapsis=0.0 deg
-  eccentricity=0.3561651416938736)                                                 ]","[0.0
+  eccentricity=0.5273683814510778)                                                 ]","[0.0
  Constellation:
   (altitudes=[ 450.          545.45454545  640.90909091  736.36363636  831.81818182
    927.27272727 1022.72727273 1118.18181818 1213.63636364 1309.09090909
   1404.54545455 1500.        ] km
   sat_distribution=[  8  13  31  81 106  66  35  30  30  29  27  24]
-  inclination=3.658564229079132 deg
-  raan_spacing=48.788881692017675 deg
+  inclination=28.61765663021162 deg
+  raan_spacing=78.99125155937679 deg
   argument_periapsis=0.0 deg
-  eccentricity=0.22489360193029362)                                                ]","[0.0
+  eccentricity=0.35819294911046884)                                                ]","[0.0
  Constellation:
   (altitudes=[ 450.          545.45454545  640.90909091  736.36363636  831.81818182
    927.27272727 1022.72727273 1118.18181818 1213.63636364 1309.09090909
   1404.54545455 1500.        ] km
   sat_distribution=[  8  13  31  81 106  66  35  30  30  29  27  24]
-  inclination=3.5781080031783135 deg
-  raan_spacing=48.62986864630234 deg
+  inclination=28.549843888376774 deg
+  raan_spacing=78.69190803324895 deg
   argument_periapsis=0.0 deg
-  eccentricity=0.2610824210009701)                                                 ]","[0.0
+  eccentricity=0.42337422014324755)                                                ]","[0.0
  Constellation:
   (altitudes=[ 450.          545.45454545  640.90909091  736.36363636  831.81818182
    927.27272727 1022.72727273 1118.18181818 1213.63636364 1309.09090909
   1404.54545455 1500.        ] km
   sat_distribution=[  8  13  31  81 106  66  35  30  30  29  27  24]
-  inclination=3.556141733742038 deg
-  raan_spacing=48.586454685891475 deg
+  inclination=28.525542089291843 deg
+  raan_spacing=78.58463341151119 deg
   argument_periapsis=0.0 deg
-  eccentricity=0.43033443670174565)                                                ]"
+  eccentricity=0.48972728172394053)                                                ]"
 "[0.0
  Constellation:
   (altitudes=[ 450.          545.45454545  640.90909091  736.36363636  831.81818182
    927.27272727 1022.72727273 1118.18181818 1213.63636364 1309.09090909
   1404.54545455 1500.        ] km
   sat_distribution=[  8  13  31  81 106  66  35  30  30  29  27  24]
-  inclination=38.34196005054036 deg
-  raan_spacing=40.57712557034802 deg
+  inclination=39.49090798967863 deg
+  raan_spacing=106.48403171068372 deg
   argument_periapsis=0.0 deg
-  eccentricity=0.8350305369000042)                                                 ]","[0.0
+  eccentricity=0.7107462051687978)                                                 ]","[0.0
  Constellation:
   (altitudes=[ 450.          545.45454545  640.90909091  736.36363636  831.81818182
    927.27272727 1022.72727273 1118.18181818 1213.63636364 1309.09090909
   1404.54545455 1500.        ] km
   sat_distribution=[  8  13  31  81 106  66  35  30  30  29  27  24]
-  inclination=19.309501896416975 deg
-  raan_spacing=45.13239855412222 deg
+  inclination=33.804886494095115 deg
+  raan_spacing=91.64026246491242 deg
   argument_periapsis=0.0 deg
-  eccentricity=0.4605016462963177)                                                 ]","[0.0
+  eccentricity=0.7620975918576924)                                                 ]","[0.0
  Constellation:
   (altitudes=[ 450.          545.45454545  640.90909091  736.36363636  831.81818182
    927.27272727 1022.72727273 1118.18181818 1213.63636364 1309.09090909
   1404.54545455 1500.        ] km
   sat_distribution=[  8  13  31  81 106  66  35  30  30  29  27  24]
-  inclination=21.28226331567835 deg
-  raan_spacing=44.488293485965535 deg
+  inclination=32.729893019843274 deg
+  raan_spacing=89.25557576338606 deg
   argument_periapsis=0.0 deg
-  eccentricity=0.3273106788116027)                                                 ]","[0.0
+  eccentricity=0.6191027008826862)                                                 ]","[0.0
  Constellation:
   (altitudes=[ 450.          545.45454545  640.90909091  736.36363636  831.81818182
    927.27272727 1022.72727273 1118.18181818 1213.63636364 1309.09090909
   1404.54545455 1500.        ] km
   sat_distribution=[  8  13  31  81 106  66  35  30  30  29  27  24]
-  inclination=22.616265474548346 deg
-  raan_spacing=44.05654805561675 deg
+  inclination=36.26118896147544 deg
+  raan_spacing=98.90005911837758 deg
   argument_periapsis=0.0 deg
-  eccentricity=0.33410853795028544)                                                ]","[0.0
+  eccentricity=0.4330158730597026)                                                 ]","[0.0
  Constellation:
   (altitudes=[ 450.          545.45454545  640.90909091  736.36363636  831.81818182
    927.27272727 1022.72727273 1118.18181818 1213.63636364 1309.09090909
   1404.54545455 1500.        ] km
   sat_distribution=[  8  13  31  81 106  66  35  30  30  29  27  24]
-  inclination=37.909832091841714 deg
-  raan_spacing=40.33283937778941 deg
+  inclination=37.681460912571254 deg
+  raan_spacing=102.75719031858189 deg
   argument_periapsis=0.0 deg
-  eccentricity=0.478634675045846)                                                  ]"
+  eccentricity=0.3660812221728511)                                                 ]"
