@@ -90,9 +90,9 @@ def generate_debris(total_debris, use_new_dataset):
         ######## to initizalize a random debris field based on the MASTER-2009 model ########
 
 
-        file_path_alt = "SMDsimulations/master_results.txt"
-        file_path_incl = "SMDsimulations/MASTER2_declination_distribution.txt"
-        file_path_diam = "SMDsimulations/MASTER2_diameter_distribution.txt"
+        file_path_alt = "Optimization/master_results.txt"
+        file_path_incl = "Optimization/MASTER2_declination_distribution.txt"
+        file_path_diam = "Optimization/MASTER2_diameter_distribution.txt"
 
         columns_alt = [
             "Altitude", "Expl-Fragm", "Coll_Fragm", "Launch/Mis", "NaK-Drops", "SRM-Slag", "SRM-Dust",
@@ -134,7 +134,7 @@ def generate_debris(total_debris, use_new_dataset):
         # Select random orbit altitudes, inclinations and diameters based on the computed probabilities
         altitudes = np.random.choice(data_alt['Altitude'], size=total_debris, p=data_alt['Probability'])*u.km
         latitudes = np.random.choice(data_incl['Declination'], size=total_debris, p=data_incl['Probability'])*u.deg
-        latitudes += 90
+        latitudes += (90*u.deg)
         diameters = np.random.choice(data_diam['Diameter'], size=total_debris, p=data_diam['Probability'])
 
         # Choose remaining orbital elements randomly
@@ -629,8 +629,8 @@ class Simulation:
 
         # Check GPU memory
         device = cp.cuda.Device(0)  # Get the first GPU
-        print("GPU id:", device.id)
-        print("Total Memory (GB):", device.mem_info[1] / 1e9)
+        # print("GPU id:", device.id)
+        # print("Total Memory (GB):", device.mem_info[1] / 1e9)
 
         debris_in_FOV = cp.array([])
         debris_in_collision = cp.array([])
@@ -639,14 +639,14 @@ class Simulation:
 
         # Calculate batch size based on available memory
         free_memory, _ = cp.cuda.runtime.memGetInfo()
-        print("Free Memory (GB):", free_memory / 1e9)
+        # print("Free Memory (GB):", free_memory / 1e9)
         batch_size = int(free_memory* 0.9/ (2*(3*total_debris+3*const.total_sats+7*const.total_sats*total_debris)) ) # 4 bytes per float32, 0.8 factor for overhead
         batch_size = 750
         # Process timesteps in batches
         for i in range(0, (len(times)),batch_size):
         
             batch_times = times[i:i+batch_size]
-            print(batch_times.shape)
+            # print(batch_times.shape)
             # Initialize all times and empty arrays to store positions. Use float16 for reduced memory usage.Choose by uncommenting: float16 or float32. change dotproducts and normproducts in detect_debris accordingly.
             # positions_deb = cp.zeros((len(batch_times), total_debris, 3), dtype=cp.float16)                 # Shape: (T, S, 3)
             # positions_sat = cp.zeros((len(batch_times), const.total_sats, 3) , dtype=cp.float16)      # Shape: (T, D, 3)
@@ -667,7 +667,7 @@ class Simulation:
 
 
             free_memory, _ = cp.cuda.runtime.memGetInfo()
-            print("Free Memory (GB):", free_memory / 1e9)
+            # print("Free Memory (GB):", free_memory / 1e9)
         
         # Flatten results across timesteps
         self.det_deb = cp.unique(debris_in_FOV).astype(int)  # Unique debris indices detected

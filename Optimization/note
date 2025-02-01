@@ -58,4 +58,4 @@ Stest completed. Elapsed time: 141.21 s
  941 944 952 954 955 956 959 960 961 962 966 969 975 976 981 987 995 999]. Efficiency: 0.63. Collisions: []. Collision penalty: 0.0/1
 
 
- conclusionç float16 is not accurate enough
+ conclusion: float16 is not accurate enough

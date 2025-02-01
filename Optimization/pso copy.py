@@ -139,7 +139,7 @@ def pso_default_parameters():
     return default_values, default_bounds
 
 
-def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, cognitive = 0.5, social = 0.5, gpu = True, **kwargs):
+def pso(n_particles, n_iterations, deb_number, n_orbits, n_sats, opt_pars, inertia = 0.5, cognitive = 0.5, social = 0.5, gpu = True, use_new_dataset=False, **kwargs):
     """
     Particle Swarm Optimization on the selected constellation parameters. 
     Pass all the starting/default parameters as kwargs, and specify which you want to optimize with "opt_par=[]"
@@ -153,6 +153,8 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
         inertia: inertia parameter
         cognitive: cognitive parameter
         social: social parameter
+        gpu: whether to use the GPU for the simulation
+        use_new_dataset: whether to generate a new debris dataset
         kwargs:  values for raan_spacing, inclination, eccentricity, w1, mu1, s1, w2, mu2, s2. if not specified, default values are used from pso_default_parameters()
 
     Returns:
@@ -162,6 +164,11 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
 
 
     """
+    # Debris
+    if not use_new_dataset:
+        deb_orbits, deb_diameters = generate_debris(deb_number, use_new_dataset)
+
+    # default values and bounds
     default_values, default_bounds = pso_default_parameters()
 
     # when a value is not specified in the kwargs, the default value is used
@@ -200,6 +207,9 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
     # first evaluation of the particles
     print('\nStarting first evaluation (Iteration 0)')
     for p in range(n_particles):
+        if use_new_dataset:
+            deb_orbits, deb_diameters = generate_debris(deb_number, use_new_dataset)
+
         positions_dict = {opt_pars[n]:positions[n,p] for n in range(dim)}
         satdist, altitudes = call_function_with_kwargs(satellite_dist, parameters, positions_dict, num_obrits=n_orbits, num_sats=n_sats)
         const = call_function_with_kwargs(Constellation, parameters, positions_dict, sat_distribution=satdist, altitudes=altitudes)
@@ -209,6 +219,7 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
         pbest_eff[0,p] = consteff
 
         pso_history[p,0,:] = [consteff, const]
+        gc.collect()
 
 
     # initialize global best position and value
@@ -290,16 +301,22 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
 
             # update history
             pso_history[p,i,:] = [consteff, const]
+            gc.collect()
 
         # update global best position and value
         if np.max(pbest_eff) > gbest_eff:
             gbest_eff = np.max(pbest_eff)
             gbest[:,0] = pbest[:,np.argmax(pbest_eff)]
 
-            
-
-        
+        # update history
         gbest_history[i] = gbest_eff
+
+        # check convergence
+        if i > 10:
+            if np.std(gbest_history[i-10:i]) < 1e-3:
+                print(f'Convergence reached after {i} iterations')
+                break
+
         i_end_time = time.time()
 
         print(f'Iteration {i+1} completed in {(i_end_time - i_start_time):.2f} seconds . Best value: {gbest_eff}')
@@ -412,18 +429,17 @@ if __name__ == '__main__':
     inertia = 0.5   
     cognitive = 0.5
     social = 0.5
-    n_particles = 2
-    n_iterations = 5
+    n_particles = 10
+    n_iterations = 100
     run_name = input('Enter the name of the run: ')
 
     # Simulation parameters (constant)
-    time_of_flight = 2 * u.hour
+    time_of_flight = 1 * u.hour
     start_time = 0*u.s      # Start time of the simulation
-    sim = Simulation (time_of_flight, start_time)
+    sim = Simulation (time_of_flight, start_time, max_timestep=7.5*u.s)
     radar = Radar()
-    deb_number = 1000
-    use_new_dataset = False
-    deb_orbits, deb_diameters = generate_debris(deb_number, use_new_dataset)
+    deb_number = 750
+    use_new_dataset = True
     gpu = True
 
     # Constant constellation parameters
@@ -431,11 +447,12 @@ if __name__ == '__main__':
     n_sats = 40*12
 
     # PSO parameters
-    opt_pars = ['raan_spacing', 'inclination', 'eccentricity']
+    #opt_pars = ['raan_spacing', 'inclination', 'eccentricity']
+    opt_pars = ['w1', 'mu1', 's1', 'w2', 'mu2', 's2']
 
     # Run PSO and save results
     pso_start_time = time.time()
-    gbest, gbest_eff, pso_history, gbest_history = pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia, cognitive, social, gpu=True)
+    gbest, gbest_eff, pso_history, gbest_history = pso(n_particles, n_iterations, deb_number, n_orbits, n_sats, opt_pars, inertia, cognitive, social, gpu=True, use_new_dataset=use_new_dataset)
     pso_end_time = time.time()
     print(f'PSO took {pso_end_time - pso_start_time} seconds to run {n_iterations} iterations with {n_particles} particles')
     save_pso_results(gbest, gbest_eff, pso_history, gbest_history, n_particles, n_iterations, opt_pars, run_name)
