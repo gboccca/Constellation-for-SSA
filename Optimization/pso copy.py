@@ -139,7 +139,7 @@ def pso_default_parameters():
     return default_values, default_bounds
 
 
-def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, cognitive = 0.5, social = 0.5, **kwargs):
+def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, cognitive = 0.5, social = 0.5, gpu = True, **kwargs):
     """
     Particle Swarm Optimization on the selected constellation parameters. 
     Pass all the starting/default parameters as kwargs, and specify which you want to optimize with "opt_par=[]"
@@ -203,7 +203,7 @@ def pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia = 0.5, co
         positions_dict = {opt_pars[n]:positions[n,p] for n in range(dim)}
         satdist, altitudes = call_function_with_kwargs(satellite_dist, parameters, positions_dict, num_obrits=n_orbits, num_sats=n_sats)
         const = call_function_with_kwargs(Constellation, parameters, positions_dict, sat_distribution=satdist, altitudes=altitudes)
-        consteff = main(sim, const, deb_orbits, deb_diameters, radar, plot=False, simid=f'0.{p}')
+        consteff = main(sim, const, deb_orbits, deb_diameters, radar, plot=False, gpu=gpu, simid=f'0.{p}')
 
         pbest[:,p] = positions[:,p]
         pbest_eff[0,p] = consteff
@@ -417,13 +417,14 @@ if __name__ == '__main__':
     run_name = input('Enter the name of the run: ')
 
     # Simulation parameters (constant)
-    time_of_flight = 0.01 * u.hour
+    time_of_flight = 2 * u.hour
     start_time = 0*u.s      # Start time of the simulation
     sim = Simulation (time_of_flight, start_time)
     radar = Radar()
-    deb_number = 500
+    deb_number = 1000
     use_new_dataset = False
     deb_orbits, deb_diameters = generate_debris(deb_number, use_new_dataset)
+    gpu = True
 
     # Constant constellation parameters
     n_orbits = 12
@@ -434,7 +435,7 @@ if __name__ == '__main__':
 
     # Run PSO and save results
     pso_start_time = time.time()
-    gbest, gbest_eff, pso_history, gbest_history = pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia, cognitive, social)
+    gbest, gbest_eff, pso_history, gbest_history = pso(n_particles, n_iterations, n_orbits, n_sats, opt_pars, inertia, cognitive, social, gpu=True)
     pso_end_time = time.time()
     print(f'PSO took {pso_end_time - pso_start_time} seconds to run {n_iterations} iterations with {n_particles} particles')
     save_pso_results(gbest, gbest_eff, pso_history, gbest_history, n_particles, n_iterations, opt_pars, run_name)

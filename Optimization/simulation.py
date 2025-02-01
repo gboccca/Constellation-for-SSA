@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 import random
 import csv
 import time
-from generic_tools import format_time
+from generic_tools import format_time, safe_norm
 import warnings
 warnings.simplefilter("ignore", category=UserWarning)
 
@@ -383,7 +383,6 @@ class Simulation:
         debris_in_FOV = np.unique(debris_in_FOV[:, 0])
         return debris_in_FOV, debris_in_collision
     
-
     def simulation_loop(self, debris_orbits, total_debris, constellation:Constellation, radar:Radar, diameters, ex_pf=ex_pf,):
         
         t = 0
@@ -532,35 +531,34 @@ class Simulation:
 
         return debris_in_FOV, debris_in_collision
 
-    
     def simulation_loop_array(self, debris_orbits, total_debris, constellation:Constellation, radar:Radar):
-        
-        times = np.arange(self.starttime.to_value(u.s), self.simtime.to_value(u.s), self.timestep.to_value(u.s))
+        # not implemented, quite useless
+        # times = np.arange(self.starttime.to_value(u.s), self.simtime.to_value(u.s), self.timestep.to_value(u.s))
 
-        positions_deb = np.zeros((len(times), total_debris, 3))
-        print(positions_deb.shape)
-        positions_sat = np.zeros((len(times), constellation.total_sats, 3))
-        for i,t in enumerate(times):
-            positions_deb[i] = propagate_all_orbits(debris_orbits, positions_deb[i], t*u.s)
-            positions_sat[i] = propagate_all_orbits(constellation.sat_orbits, positions_sat[i], t*u.s)
+        # positions_deb = np.zeros((len(times), total_debris, 3))
+        # print(positions_deb.shape)
+        # positions_sat = np.zeros((len(times), constellation.total_sats, 3))
+        # for i,t in enumerate(times):
+        #     positions_deb[i] = propagate_all_orbits(debris_orbits, positions_deb[i], t*u.s)
+        #     positions_sat[i] = propagate_all_orbits(constellation.sat_orbits, positions_sat[i], t*u.s)
 
-        positions_deb = propagate_all_orbits_gpu(positions_deb_0, deb_v, times, debris_orbits)
+        # positions_deb = propagate_all_orbits_gpu(positions_deb_0, deb_v, times, debris_orbits)
 
-        # Run detection for all timesteps at once
-        debris_in_FOV, debris_in_collision = self.detect_debris_array(positions_sat, positions_deb, radar)
+        # # Run detection for all timesteps at once
+        # debris_in_FOV, debris_in_collision = self.detect_debris_array(positions_sat, positions_deb, radar)
 
-        # Flatten results across timesteps
-        self.det_deb = np.unique(debris_in_FOV[:, 1]).astype(int)  # Unique debris indices detected
-        self.col_deb = np.unique(debris_in_collision[:, 1]).astype(int)  # Unique debris indices in collision
+        # # Flatten results across timesteps
+        # self.det_deb = np.unique(debris_in_FOV[:, 1]).astype(int)  # Unique debris indices detected
+        # self.col_deb = np.unique(debris_in_collision[:, 1]).astype(int)  # Unique debris indices in collision
 
-        # Store positions and detection times
-        self.det_pos = np.zeros((total_debris, 3))
-        self.det_time = np.zeros(total_debris)
-        for i, debris_idx in enumerate(self.det_deb):
-            first_detection = debris_in_FOV[debris_in_FOV[:, 1] == debris_idx, 0].min()  # First timestep it was detected
-            self.det_pos[debris_idx] = positions_deb[first_detection, debris_idx]
-            self.det_time[debris_idx] = times[first_detection]
-
+        # # Store positions and detection times
+        # self.det_pos = np.zeros((total_debris, 3))
+        # self.det_time = np.zeros(total_debris)
+        # for i, debris_idx in enumerate(self.det_deb):
+        #     first_detection = debris_in_FOV[debris_in_FOV[:, 1] == debris_idx, 0].min()  # First timestep it was detected
+        #     self.det_pos[debris_idx] = positions_deb[first_detection, debris_idx]
+        #     self.det_time[debris_idx] = times[first_detection]
+        pass
 
     def detect_debris_array_GPU(self, position_sat, position_deb, radar):
         """
@@ -571,56 +569,58 @@ class Simulation:
             position_sat (cp.array): Shape (timesteps, total_sats, 3) - Satellite positions over time.
             position_deb (cp.array): Shape (timesteps, total_debris, 3) - Debris positions over time.
             radar (Radar): Radar object containing max_range and FOV attributes.
+            
 
         Returns:
-            cp.array: Indices of detected debris per timestep.
-            cp.array: Indices of collision debris per timestep.
+            cp.array: Indices of detected debris.
+            cp.array: Indices of collision debris.
         """
-
-
-
-        # Compute relative positions: (T, D, S, 3)
-        rel_positions = position_deb[:, :, cp.newaxis, :] - position_sat[:, cp.newaxis, :, :]
-
-
-
+        
+        # Compute relative positions: (T, D, S, 3). Careful: this is 7GB of RAM for 1000 debris, 440 satellites and 1440 timesteps
+        rel_positions = (position_deb[:, :, cp.newaxis, :] - position_sat[:, cp.newaxis, :, :])
+        
         # max_rel_positions = cp.abs(cp.max(rel_positions))
         # print("Max rel positions:",max_rel_positions)
+
         # # Compute distances: (T, D, S)
         # distances = cp.linalg.norm(rel_positions/max_rel_positions, axis=3)*max_rel_positions
-        # print("Distances:",distances)
+        #distances = cp.linalg.norm(rel_positions.astype(cp.float32), axis=3).astype(cp.float16)
+        distances = cp.linalg.norm(rel_positions, axis=3)
+        # distances = safe_norm(rel_positions, axis=3)
 
         # Compute dot products: (T, D, S)
         dotproducts = cp.sum(rel_positions * position_sat[:, cp.newaxis, :, :], axis=3)
-        del rel_positions
         
-        # Compute distances: (T, D, S)
-        distances = cp.linalg.norm(rel_positions, axis=3)
-        print("Distances:",distances)
+        #print("Distances:",distances)
         # Compute norm products: (T, D, S)
+        #normproducts = cp.linalg.norm(position_sat.astype(cp.float32), axis=2).astype(cp.float16)[:, cp.newaxis, :] * distances
         normproducts = cp.linalg.norm(position_sat, axis=2)[:, cp.newaxis, :] * distances
-
+        #normproducts = safe_norm(position_sat, axis=2)[cp.newaxis, :, :] * distances
+        
         # Compute angles: (T, D, S)
         angles = cp.arccos(cp.clip(dotproducts / normproducts, -1.0, 1.0)) * (180 / cp.pi)
-        del dotproducts, normproducts
+        # print((rel_positions/distances[...,cp.newaxis]).shape)
+        # print(position_sat[:, cp.newaxis, :, :].shape)
+        # angles = cp.arccos(cp.dot(rel_positions/distances[...,cp.newaxis], position_sat[:, cp.newaxis, :, :])) * 180/cp.pi
 
         # Find debris in collision range: (T, num_collisions)
         debris_in_collision = cp.unique(cp.argwhere(distances < self.collision_range)[:, [0, 1]], axis=0)
 
         # Find debris in radar FOV: (T, num_detected)
         debris_in_FOV = cp.unique(cp.argwhere((distances < radar.max_range) & (angles < radar.FOV))[:, [0, 1]], axis=0)
-
+        
         return debris_in_FOV, debris_in_collision
 
-    def simulation_loop_array_GPU(self, debris_orbits, total_debris, constellation:Constellation, radar:Radar):
+    def simulation_loop_array_GPU(self, debris_orbits, total_debris, const:Constellation, radar:Radar, ):
         """
-        Run the simulation loop using GPU parallelization and vectorized operations. Stores the results in the Simulation object.
+        Run the simulation loop using GPU parallelization and vectorized operations. Stores the results in the Simulation object. 
         
         Args:
             debris_orbits (list): List of Orbit objects representing the debris orbits.
             total_debris (int): Number of debris particles to simulate.
-            constellation (Constellation): Constellation object.
+            const (Constellation): Constellation object.
             radar (Radar): Radar object.
+            batch_size (int): Number of timesteps to process at once. Default is 500.
 
         Returns:
             None
@@ -628,44 +628,66 @@ class Simulation:
 
 
         # Check GPU memory
-        #device = cp.cuda.Device(0)  # Get the first GPU
-        # print("GPU Name:", device.id)
-        # print("Total Memory (GB):", device.mem_info[1] / 1e9)
-        # print("Free Memory (GB):", device.mem_info[0] / 1e9)
+        device = cp.cuda.Device(0)  # Get the first GPU
+        print("GPU id:", device.id)
+        print("Total Memory (GB):", device.mem_info[1] / 1e9)
 
-        # Initialize all times and empty arrays to store positions. Use float16 for reduced memory usage.
+        debris_in_FOV = cp.array([])
+        debris_in_collision = cp.array([])
+
         times = np.arange(self.starttime.to_value(u.s), self.simtime.to_value(u.s), self.timestep.to_value(u.s))
-        positions_deb = cp.zeros((len(times), total_debris, 3), dtype=cp.float32)                   # Shape: (T, S, 3)
-        positions_sat = cp.zeros((len(times), constellation.total_sats, 3) , dtype=cp.float32)      # Shape: (T, D, 3)
 
-        # Propagate all orbits at all times using cowell()
-        positions_deb = propagate_all_orbits_gpu(positions_deb, times, debris_orbits)
-        positions_sat = propagate_all_orbits_gpu(positions_sat, times, constellation.sat_orbits)
-
-        # print("debris positions:",positions_deb)
-        # print("satellite positions:",positions_sat)
+        # Calculate batch size based on available memory
+        free_memory, _ = cp.cuda.runtime.memGetInfo()
+        print("Free Memory (GB):", free_memory / 1e9)
+        batch_size = int(free_memory* 0.9/ (2*(3*total_debris+3*const.total_sats+7*const.total_sats*total_debris)) ) # 4 bytes per float32, 0.8 factor for overhead
+        batch_size = 750
+        # Process timesteps in batches
+        for i in range(0, (len(times)),batch_size):
         
-        # Run detection for all timesteps at once
-        debris_in_FOV, debris_in_collision = self.detect_debris_array_GPU(positions_sat, positions_deb, radar)
-        # print(debris_in_FOV, debris_in_collision)
+            batch_times = times[i:i+batch_size]
+            print(batch_times.shape)
+            # Initialize all times and empty arrays to store positions. Use float16 for reduced memory usage.Choose by uncommenting: float16 or float32. change dotproducts and normproducts in detect_debris accordingly.
+            # positions_deb = cp.zeros((len(batch_times), total_debris, 3), dtype=cp.float16)                 # Shape: (T, S, 3)
+            # positions_sat = cp.zeros((len(batch_times), const.total_sats, 3) , dtype=cp.float16)      # Shape: (T, D, 3)
+
+            positions_deb = cp.zeros((len(batch_times), total_debris, 3), dtype=cp.float32)                 # Shape: (T, S, 3)
+            positions_sat = cp.zeros((len(batch_times), const.total_sats, 3) , dtype=cp.float32)      # Shape: (T, D, 3)
+            # Propagate all orbits at all times using cowell()
+            positions_deb = propagate_all_orbits_gpu(positions_deb, batch_times, debris_orbits)
+            positions_sat = propagate_all_orbits_gpu(positions_sat, batch_times, const.sat_orbits)
+
+
+            
+            # Run detection for all timesteps at once
+            batch_debris_in_FOV, batch_debris_in_collision = self.detect_debris_array_GPU(positions_sat, positions_deb, radar)
+            # print(debris_in_FOV, debris_in_collision)
+            debris_in_FOV = cp.append(debris_in_FOV, batch_debris_in_FOV)
+            debris_in_collision = cp.append(debris_in_collision, batch_debris_in_collision)
+
+
+            free_memory, _ = cp.cuda.runtime.memGetInfo()
+            print("Free Memory (GB):", free_memory / 1e9)
+        
         # Flatten results across timesteps
-        self.det_deb = cp.unique(debris_in_FOV[:, 1]).astype(int)  # Unique debris indices detected
-        self.col_deb = cp.unique(debris_in_collision[:, 1]).astype(int)  # Unique debris indices in collision
+        self.det_deb = cp.unique(debris_in_FOV).astype(int)  # Unique debris indices detected
+        self.col_deb = cp.unique(debris_in_collision).astype(int)  # Unique debris indices in collision
 
-        # Store positions and detection times
-        times = cp.asarray(times)
-        self.det_pos = cp.zeros((total_debris, 3))
-        self.det_time = cp.zeros(total_debris)
-        for i, debris_idx in enumerate(self.det_deb):
-            first_detection = debris_in_FOV[debris_in_FOV[:, 1] == debris_idx, 0].min()  # First timestep it was detected
-            self.det_pos[debris_idx] = positions_deb[first_detection, debris_idx]
-            self.det_time[debris_idx] = times[first_detection]
+        # Store positions and detection times - i really dont feel like doing this rn. 
+        # times = cp.asarray(times)
+        # self.det_pos = cp.zeros((total_debris, 3))
+        # self.det_time = cp.zeros(total_debris)
+        # for i, debris_idx in enumerate(self.det_deb):
+        #     first_detection = int(debris_in_FOV[debris_in_FOV == debris_idx].min())  # First timestep it was detected
+
+        #     self.det_pos[debris_idx] = positions_deb[first_detection, debris_idx]
+        #     self.det_time[debris_idx] = times[first_detection]
         
-        # Convert results back to CPU
-        self.det_deb = self.det_deb.get()
-        self.det_pos = self.det_pos.get()
-        self.det_time = self.det_time.get()
-        self.col_deb = self.col_deb.get()
+        # # Convert results back to CPU
+        # self.det_deb = self.det_deb.get()
+        # self.det_pos = self.det_pos.get()
+        # self.det_time = self.det_time.get()
+        # self.col_deb = self.col_deb.get()
 
 
 
@@ -708,7 +730,7 @@ def plot_simulation_results(det_deb, position_deb, det_time):
 
 
 
-def main(sim:Simulation, const:Constellation, deb_orbits, deb_diameters, rad:Radar, plot:bool=True, simid='test'):
+def main(sim:Simulation, const:Constellation, deb_orbits, deb_diameters, rad:Radar, plot:bool=False, gpu:bool=True, simid='test'):
     """
     This function runs the simulation of the input constellation and returns the efficiency of the constellation in detecting debris.
 
@@ -730,10 +752,16 @@ def main(sim:Simulation, const:Constellation, deb_orbits, deb_diameters, rad:Rad
     # Run the simulation
     start_stopwatch = time.time()
     
+    if gpu and plot:
+        raise ValueError("Cannot plot and run on GPU at the same time. I didnt implement that. If you want to plot nicely, run on CPU.")
     #sim.simulation_loop(deb_orbits, total_debris, const, rad, deb_diameters)
     #sim.simulation_loop_gpu(deb_orbits, total_debris, const, rad, deb_diameters)
     #sim.simulation_loop_array(deb_orbits, total_debris, const, rad)
-    sim.simulation_loop_array_GPU(deb_orbits, total_debris, const, rad)
+    if gpu:
+        sim.simulation_loop_array_GPU(deb_orbits, total_debris, const, rad)
+    else:
+        sim.simulation_loop(deb_orbits, total_debris, const, rad, deb_diameters)
+    
     end_stopwatch = time.time()
     elapsed_time = end_stopwatch - start_stopwatch
 
@@ -770,7 +798,7 @@ if __name__ == "__main__":
 
     #### Debris 
     use_new_dataset = False  # Set to False to use the test dataset, True to use the MASTER-2009 model
-    total_debris = 500  # Number of debris particles to simulate. if not using the test dataset, can be arbitrarily chosen. 
+    total_debris = 1000  # Number of debris particles to simulate. if not using the test dataset, can be arbitrarily chosen. 
                             # if using the test dataset, must be one of the following: 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000
 
     #### Radar
