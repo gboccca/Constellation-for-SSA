@@ -417,7 +417,116 @@ def save_pso_results(gbest, gbest_eff, pso_history, gbest_history, n_particles, 
 
         plt.savefig(f'Optimization/pso_plots/{run_name}/eta_vs_{opt_pars[0]}_{opt_pars[1]}_{opt_pars[2]}.png')
         plt.close()
-    
+
+    if len(opt_pars) == 6:
+        x = np.array([pso_history[j,i,1].asdict[opt_pars[0]] for j in range(n_particles) for i in range(n_iterations)])
+        y = np.array([pso_history[j,i,1].asdict[opt_pars[1]] for j in range(n_particles) for i in range(n_iterations)])
+        z = np.array([pso_history[j,i,1].asdict[opt_pars[2]] for j in range(n_particles) for i in range(n_iterations)])
+        c = np.array([pso_history[j,i,0] for j in range(n_particles) for i in range(n_iterations)])
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        scatter = ax.scatter(x, y, z, c=c, cmap='viridis')
+
+        ax.set_xlabel(opt_pars[0])
+        ax.set_ylabel(opt_pars[1])
+        ax.set_zlabel(opt_pars[2])
+        ax.set_title(f'Efficiency vs {opt_pars[0]}, {opt_pars[1]} and {opt_pars[2]}')
+
+        cbar = fig.colorbar(scatter, ax=ax, shrink=0.6, aspect=20, pad=0.1)
+        cbar.set_label('Efficiency')
+
+        plt.savefig(f'Optimization/pso_plots/{run_name}/eta_vs_{opt_pars[0]}_{opt_pars[1]}_{opt_pars[2]}.png')
+        plt.close()
+
+        x = np.array([pso_history[j,i,1].asdict[opt_pars[3]] for j in range(n_particles) for i in range(n_iterations)])
+        y = np.array([pso_history[j,i,1].asdict[opt_pars[4]] for j in range(n_particles) for i in range(n_iterations)])
+        z = np.array([pso_history[j,i,1].asdict[opt_pars[5]] for j in range(n_particles) for i in range(n_iterations)])
+        c = np.array([pso_history[j,i,0] for j in range(n_particles) for i in range(n_iterations)])
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        scatter = ax.scatter(x, y, z, c=c, cmap='viridis')
+
+        ax.set_xlabel(opt_pars[3])
+        ax.set_ylabel(opt_pars[4])
+        ax.set_zlabel(opt_pars[5])
+        ax.set_title(f'Efficiency vs {opt_pars[3]}, {opt_pars[4]} and {opt_pars[5]}')
+
+        cbar = fig.colorbar(scatter, ax=ax, shrink=0.6, aspect=20, pad=0.1)
+        cbar.set_label('Efficiency')
+
+        plt.savefig(f'Optimization/pso_plots/{run_name}/eta_vs_{opt_pars[3]}_{opt_pars[4]}_{opt_pars[5]}.png')
+        plt.close()
+
+    if len(opt_pars) == 9:
+
+        x = np.array([pso_history[j,i,1].asdict[opt_pars[0]] for j in range(n_particles) for i in range(n_iterations)])
+        y = np.array([pso_history[j,i,1].asdict[opt_pars[1]] for j in range(n_particles) for i in range(n_iterations)])
+        z = np.array([pso_history[j,i,1].asdict[opt_pars[2]] for j in range(n_particles) for i in range(n_iterations)])
+        c = np.array([pso_history[j,i,0] for j in range(n_particles) for i in range(n_iterations)])
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        scatter = ax.scatter(x, y, z, c=c, cmap='viridis')
+
+        ax.set_xlabel(opt_pars[0])
+        ax.set_ylabel(opt_pars[1])
+        ax.set_zlabel(opt_pars[2])
+        ax.set_title(f'Efficiency vs {opt_pars[0]}, {opt_pars[1]} and {opt_pars[2]}')
+
+        cbar = fig.colorbar(scatter, ax=ax, shrink=0.6, aspect=20, pad=0.1)
+        cbar.set_label('Efficiency')
+
+        plt.savefig(f'Optimization/pso_plots/{run_name}/eta_vs_{opt_pars[0]}_{opt_pars[1]}_{opt_pars[2]}.png')
+        plt.close()
+
+        x = np.array([pso_history[j,i,1].asdict[opt_pars[3]] for j in range(n_particles) for i in range(n_iterations)])
+        y = np.array([pso_history[j,i,1].asdict[opt_pars[4]] for j in range(n_particles) for i in range(n_iterations)])
+        z = np.array([pso_history[j,i,1].asdict[opt_pars[5]] for j in range(n_particles) for i in range(n_iterations)])
+        c = np.array([pso_history[j,i,0] for j in range(n_particles) for i in range(n_iterations)])
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        scatter = ax.scatter(x, y, z, c=c, cmap='viridis')
+
+        ax.set_xlabel(opt_pars[3])
+        ax.set_ylabel(opt_pars[4])
+        ax.set_zlabel(opt_pars[5])
+        ax.set_title(f'Efficiency vs {opt_pars[3]}, {opt_pars[4]} and {opt_pars[5]}')
+
+        cbar = fig.colorbar(scatter, ax=ax, shrink=0.6, aspect=20, pad=0.1)
+        cbar.set_label('Efficiency')
+
+        plt.savefig(f'Optimization/pso_plots/{run_name}/eta_vs_{opt_pars[3]}_{opt_pars[4]}_{opt_pars[5]}.png')
+        plt.close()
+
+        x = np.array([pso_history[j,i,1].asdict[opt_pars[6]] for j in range(n_particles) for i in range(n_iterations)])
+        y = np.array([pso_history[j,i,1].asdict[opt_pars[7]] for j in range(n_particles) for i in range(n_iterations)])
+        z = np.array([pso_history[j,i,1].asdict[opt_pars[8]] for j in range(n_particles) for i in range(n_iterations)])
+        c = np.array([pso_history[j,i,0] for j in range(n_particles) for i in range(n_iterations)])
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        scatter = ax.scatter(x, y, z, c=c, cmap='viridis')
+
+        ax.set_xlabel(opt_pars[6])
+        ax.set_ylabel(opt_pars[7])
+        ax.set_zlabel(opt_pars[8])
+        ax.set_title(f'Efficiency vs {opt_pars[6]}, {opt_pars[7]} and {opt_pars[8]}')
+
+        cbar = fig.colorbar(scatter, ax=ax, shrink=0.6, aspect=20, pad=0.1)
+        cbar.set_label('Efficiency')
+
+        plt.savefig(f'Optimization/pso_plots/{run_name}/eta_vs_{opt_pars[6]}_{opt_pars[7]}_{opt_pars[8]}.png')
+        plt.close()
+
+
     print(f'Plots saved successfully to "Optimization/pso_plots/"')
         
 
@@ -436,9 +545,9 @@ if __name__ == '__main__':
     # Simulation parameters (constant)
     time_of_flight = 1 * u.hour
     start_time = 0*u.s      # Start time of the simulation
-    sim = Simulation (time_of_flight, start_time, max_timestep=7.5*u.s)
+    sim = Simulation (time_of_flight, start_time, max_timestep=5*u.s)
     radar = Radar()
-    deb_number = 750
+    deb_number = 1000
     use_new_dataset = True
     gpu = True
 
@@ -448,7 +557,7 @@ if __name__ == '__main__':
 
     # PSO parameters
     #opt_pars = ['raan_spacing', 'inclination', 'eccentricity']
-    opt_pars = ['w1', 'mu1', 's1', 'w2', 'mu2', 's2']
+    opt_pars = ['raan_spacing', 'inclination', 'eccentricity', 'w1', 'mu1', 's1', 'w2', 'mu2', 's2']
 
     # Run PSO and save results
     pso_start_time = time.time()

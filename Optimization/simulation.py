@@ -16,6 +16,7 @@ import time
 from generic_tools import format_time, safe_norm
 import warnings
 warnings.simplefilter("ignore", category=UserWarning)
+warnings.simplefilter("ignore", category=FutureWarning)
 
 ################################## INPUTS ##################################
 
@@ -163,6 +164,7 @@ class Constellation:
 
     def __init__(self, **kwargs):
 
+        # Basic Constellation Parameters. Altitudes and satellite distribution are required.
         self.altitudes = kwargs.get("altitudes")
         self.sat_distribution = kwargs.get("sat_distribution")
         self.inclination = kwargs.get("inclination", 90)
@@ -172,9 +174,33 @@ class Constellation:
         self.total_sats = sum(self.sat_distribution)
         if type(self.altitudes) == None or type(self.sat_distribution) == None:
             raise ValueError("Constellation: Altitudes and satellite distribution must be provided.")
-        self.asdict = {"altitudes": self.altitudes, "sat_distribution": self.sat_distribution, "inclination": self.inclination, "raan_spacing": self.raan_spacing, "argument_periapsis": self.argument_periapsis, "eccentricity": self.eccentricity, "total_sats": self.total_sats}
-        self.asarray = [self.altitudes, self.sat_distribution, self.inclination, self.raan_spacing, self.argument_periapsis, self.eccentricity]
+        
+        # Store the Gaussian parameters used to create the constellation
+        self.mu1 = kwargs.get("mu1", None)
+        self.s1 = kwargs.get("s1", None)
+        self.w1 = kwargs.get("w1", None)
+        self.mu2 = kwargs.get("mu2", None)
+        self.s2 = kwargs.get("s2", None)
+        self.w2 = kwargs.get("w2", None)
 
+        # Store the parameters as a dictionary and array, mainly for plotting in PSO runs. array is currently unused.
+        self.asdict = { "altitudes": self.altitudes,
+                        "sat_distribution": self.sat_distribution, 
+                        "inclination": self.inclination, 
+                        "raan_spacing": self.raan_spacing, 
+                        "argument_periapsis": self.argument_periapsis, 
+                        "eccentricity": self.eccentricity, 
+                        "total_sats": self.total_sats, 
+                        "mu1": self.mu1,
+                        "s1": self.s1,
+                        "w1": self.w1,
+                        "mu2": self.mu2,
+                        "s2": self.s2,
+                        "w2": self.w2}
+        
+        #self.asarray = [self.altitudes, self.sat_distribution, self.inclination, self.raan_spacing, self.argument_periapsis, self.eccentricity, self.total_sats, self.mu1, self.s1, self.w1, self.mu2, self.s2, self.w2]
+
+        # Convert to astropy units
         self.altitudes *= u.km
         self.inclination *= u.deg
         self.raan_spacing *= u.deg
@@ -183,11 +209,10 @@ class Constellation:
 
 
     def __repr__(self):
-        return f"Constellation:\n (altitudes={self.altitudes}\n sat_distribution={self.sat_distribution}\n inclination={self.inclination}\n raan_spacing={self.raan_spacing}\n argument_periapsis={self.argument_periapsis}\n eccentricity={self.eccentricity})"
-    
+        return str(self.asdict)
     def generate_satellites(self):
         """
-        Generate a constellation of satellites in a given number of planes with a given number of satellites per plane.
+        Generate a constellation of satellite Orbit objects in a given number of planes with a given number of satellites per plane.
 
         Args:
             altitudes (list): List of altitudes for the satellite planes.
@@ -232,7 +257,7 @@ class Constellation:
 
 def propagate_all_orbits(orbits:list, positions:np.array, time):
     """
-    Propagate all orbits to a given time.
+    Propagate all orbits to a given time, sequentially with a for loop (heavy on CPU).
     
     Args:
         orbits (list): List of Orbit objects to propagate.
@@ -419,9 +444,9 @@ class Simulation:
         self.col_deb = self.col_deb.astype(int)
 
     def detect_debris_gpu(self, position_sat, position_deb, radar:Radar):
-
         """
-        GPU implementation of detect_debris2
+        GPU implementation of detect_debris2.
+        Made to process one timestep at a time.
 
         Args:
             position_sat (np.array): 3D positions of the satellites in Cartesian coordinates.
@@ -434,8 +459,8 @@ class Simulation:
         Returns:
             list: updated list of detected debris.
             Time: Updated timestep.
-
         """
+
         # Move data to GPU
         position_sat = cp.asarray(position_sat)
         position_deb = cp.asarray(position_deb)
@@ -458,7 +483,21 @@ class Simulation:
         return debris_in_FOV.get(), debris_in_collision.get()
 
     def simulation_loop_gpu(self, debris_orbits, total_debris, constellation:Constellation, radar:Radar, diameters, ex_pf=ex_pf,):
+        """
+        Run the simulation "loop" using GPU parallelization.
+        Processes one timestep at a time. Stores the results in the Simulation object.
         
+        Args:
+            debris_orbits (list): List of Orbit objects representing the debris orbits.
+            total_debris (int): Number of debris particles to simulate.
+            constellation (Constellation): Constellation object.
+            radar (Radar): Radar object.
+            diameters (list): List of diameters of the debris particles. - unused
+            ex_pf (function): Probability function to detect debris. - unused
+        
+        Returns:
+            None
+        """
         t = 0
         self.timestep = self.max_timestep
         self.position_deb = np.zeros((total_debris, 3))                     # debris positions in cartesian coordinates
@@ -613,7 +652,8 @@ class Simulation:
 
     def simulation_loop_array_GPU(self, debris_orbits, total_debris, const:Constellation, radar:Radar, ):
         """
-        Run the simulation loop using GPU parallelization and vectorized operations. Stores the results in the Simulation object. 
+        Run the simulation "loop" using GPU parallelization and vectorized operations.
+        Runs batch_size timesteps at a time. Stores the results in the Simulation object. 
         
         Args:
             debris_orbits (list): List of Orbit objects representing the debris orbits.
