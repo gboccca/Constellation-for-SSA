@@ -6,8 +6,9 @@ import pandas as pd
 from scipy.stats import norm
 from scipy.optimize import curve_fit
 from scipy.special import erf
+import warnings 
 
-file_path_alt = r"C:\Users\bocca\OneDrive - TUM\Documenti\GitHub\Constellation-for-SSA\Optimization\master_results.txt"
+file_path_alt = r"Optimization\master_results.txt"
 
 columns_alt = [
     "Altitude", "Expl-Fragm", "Coll_Fragm", "Launch/Mis", "NaK-Drops", "SRM-Slag", "SRM-Dust",

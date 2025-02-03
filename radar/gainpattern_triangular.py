@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from scipy.constants import pi,c
 
 # Antenna parameters
-Nx = 50 # number of elements in the x-direction
-Ny = 50 # number of elements in the y-direction
+Nx = 180 # number of elements in the x-direction
+Ny = 180 # number of elements in the y-direction
 dx = 0.5  # spacing between elements in the x-direction (in wavelengths)
 dy = dx  # spacing between elements in the y-direction (in wavelengths)
 freq_GHz = 10.0 # frequency (GHz)
@@ -37,8 +37,8 @@ num_elements = Nx * Ny
 
 
 # Beam steering angles
-theta0 = 30 # Beam steering angle in theta (degrees)
-phi0 = 45 # 0Beam steering angle in phi (degrees)
+theta0 = 0 # Beam steering angle in theta (degrees)
+phi0 = 0 # 0Beam steering angle in phi (degrees)
 
 
 
@@ -79,9 +79,6 @@ plt.show()
 
 
 # Calculate sterring vector
-
-
-
 # this is the function to edit in case the lobes at singularity angles are actually wrong
 def steering_vector(k, xv, yv, theta_deg, phi_deg):
 
@@ -95,6 +92,8 @@ def steering_vector(k, xv, yv, theta_deg, phi_deg):
     phase_weights = np.exp(1j * (kx * xv + ky * yv))
 
     return phase_weights
+
+
 
 
 phase_weights = steering_vector(k=k,
@@ -346,7 +345,6 @@ array_factor_plot_dB = array_factor_dB.clip(min=min_thres)
 
 min_thres = np.max(array_gain_dBi) - 50
 array_gain_plot_dBi = array_gain_dBi.clip(min=min_thres)
-
 
 
 

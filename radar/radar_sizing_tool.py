@@ -14,7 +14,8 @@ def plot_range_vs_peak_power(data):
     range_array = np.linspace(0, 100000, 1000)  # Range values in [m]
     Pt_values = []
     for R in range_array:
-        Pt_values.append(calculate_peak_power_track(data, R))
+        Pt, Pr = calculate_peak_power_track(data, R)
+        Pt_values.append(Pt)
 
     plt.plot(range_array, Pt_values, label='Peak Power vs Range')
     plt.xlabel('Range (m)')
@@ -24,7 +25,7 @@ def plot_range_vs_peak_power(data):
     # Add markers for ranges from 0 to 100000 m, every 10000m
     markers = [20000, 40000, 50000, 60000, 70000, 80000]
     for marker in markers:
-        Pt_marker = calculate_peak_power_track(data, marker)
+        Pt_marker, _ = calculate_peak_power_track(data, marker)
         if marker <= 70000:
             plt.plot(marker, Pt_marker, 'ro')  # 'ro' means red color, circle marker
             plt.text(marker, Pt_marker * 1.2, f'{Pt_marker:.2e} W', color='red', fontsize=10, fontweight='bold')  # Shift text more above the marker
@@ -61,8 +62,8 @@ def plot_range_resolution_vs_B(data):
 # ------ I/O ------ # 
 
 if __name__ == '__main__':
-    Pt = calculate_peak_power_track(data)
-    print(f'Pt@={Pt} @ R={data.R/1000}km')
+    Pt, Pr = calculate_peak_power_track(data)
+    print(f'Pt={Pt}, Pr={Pr} @ R={data.R/1000}km')
 
     plot_range_vs_peak_power(data)
     plot_range_resolution_vs_B(data)

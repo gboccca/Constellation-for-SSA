@@ -13,7 +13,9 @@ eta = 0.3       # Antenna Efficiency [-]
 N = 250000       # Number of array elements
 A = N*(lamda/2)**2  # Antenna Aperture (Effective Area) [m2]
 d = lamda*0.5   # Distance between array elements [m]
-G = 10**(50/10)       # Antenna Gain [-] - from gainpattern.py
+GSF = 1/1.2     # Gain Safety Factor [-]
+G = GSF*10**(50/10)       # Antenna Gain [-] - from gainpattern.py
+
 
 
 # ------ performance data ------ # 

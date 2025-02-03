@@ -57,7 +57,7 @@ def generate_debris(total_debris, use_new_dataset):
             raise ValueError("The total number of particles must be one of the following: 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000")
 
 
-        filename = fr'C:\Users\bocca\OneDrive - TUM\Documenti\GitHub\Constellation-for-SSA\Optimization\test_datasets\{total_debris}debris.csv'
+        filename = fr'Optimization\test_datasets\{total_debris}debris.csv'
         # Read CSV into a dictionary
         with open(filename, "r") as file:
             reader = csv.DictReader(file)
@@ -283,12 +283,12 @@ def propagate_all_orbits(orbits:list, positions:np.array, time):
 def propagate_all_orbits_gpu(positions:cp.array, end_times:np.array, orbits:list):
     """
     Propagate all orbits to a given time using Cowell method and GPU acceleration.
-    
+    Cowell is the only method that can propagate to an array of times, avoiding a for loop.
+
     Args:
         positions: (cp.array): empty array to store the 3D positions of the orbits in Cartesian coordinates.
         end_times (cp.array): Array of times to propagate the orbits to.
         orbits (list): List of Orbit objects to propagate.
-        
         
     Returns:
         cp.array: 3D positions of the orbits in Cartesian coordinates.
@@ -312,25 +312,6 @@ def propagate_all_orbits_gpu(positions:cp.array, end_times:np.array, orbits:list
 ################################## DETECTION (unused) ##################################
 
 
-# example probability distribution
-# (probability decreases with distance, increases with size and has small velocity effect)
-def ex_pf(vel, distance, dim):
-
-    probability = max(0,min(0.5 - 0.1 * distance + 0.1 * dim - 0.05 * abs(vel).value))
-    print('Probability: ', probability)
-
-    return probability
-
-# implementation of the probability function
-def detection(probability_function, velocity, distance, size):
-    detection_probability = probability_function(velocity, distance, size)
-    if not (0 <= detection_probability <= 1):
-        raise ValueError("Probability function returned a value outside [0,1].")
-
-    return 1 # overruling the actual return value of the probability function to detect every debris that enters the FOV
-    return 1 if random.random () < detection_probability else 0
-
-
 
 ################################## RADAR ##################################
 class Radar:
@@ -352,27 +333,27 @@ class Simulation:
         self.safe_range = safe_range
         self.collision_range = collision_range
         self.timestep = max_timestep
+
+        # Empty Result Arrays
         self.det_deb = None
-        self.col_deb = None
-        self.position_deb = None
-        self.position_sat = None
         self.det_pos = None
         self.det_time = None
         self.det_sat = None
         
+        self.col_deb = None
+        self.col_pos = None
+        self.col_time = None
+        self.col_sat = None
+
+        self.position_deb = None
+        self.position_sat = None
+
     def __repr__(self):
         return f"Simulation(simtime={self.simtime}, starttime={self.starttime}, max_timestep={self.max_timestep}, min_timestep={self.min_timestep}, safe_range={self.safe_range})"
-################################## DYNAMIC TIMESTEP UPDATES ##################################
-# removed because it slowed down too much and increasing debris number still renders the idea
-    def update_timestep(self, distances):
-        return None
-        if np.any(np.argwhere(distances < self.safe_range)):                                     # update timestep if debris is too close to a satellite
-            self.timestep = max(self.min_timestep, self.timestep - 0.5*u.s)
-            #print(f'Debris too close to satellite, reducing timestep to {self.timestep:.2f}')
+    
+    ################################## DYNAMIC TIMESTEP UPDATES ##################################
 
-        else: 
-            self.timestep = self.max_timestep
-            #print('No debris too close to satellite, increasing timestep to ', timestep)
+
 
 
 ################################## DETECTION ALGORITHM ##################################
@@ -416,7 +397,6 @@ class Simulation:
         self.timestep = self.max_timestep
         self.position_deb = np.zeros((total_debris, 3))                     # debris positions in cartesian coordinates
         self.position_sat = np.zeros((constellation.total_sats, 3))         # satellite positions in cartesian coordinates
-        #v_debs = np.zeros((total_debris, 3))
         self.det_deb = []
         self.col_deb = []
         self.det_pos = np.zeros((total_debris, 3))
@@ -426,7 +406,6 @@ class Simulation:
         while t < self.simtime:
 
             t += self.timestep
-            #print(format_time(t.to_value(u.s)))
 
             # Calculate the positions of the debris and satellites at the current time
             self.position_deb = propagate_all_orbits(debris_orbits, self.position_deb, t)
@@ -445,161 +424,6 @@ class Simulation:
         self.col_deb = np.unique(self.col_deb)
         self.col_deb = self.col_deb.astype(int)
 
-    def detect_debris_gpu(self, position_sat, position_deb, radar:Radar):
-        """
-        GPU implementation of detect_debris2.
-        Made to process one timestep at a time.
-
-        Args:
-            position_sat (np.array): 3D positions of the satellites in Cartesian coordinates.
-            position_deb (np.array): 3D positions of the debris in Cartesian coordinates.
-            max_range (float): Maximum detection range of the satellites.
-            FOV (float): Field of view half-width of the satellites.
-            det_deb (list): List of detected debris.
-            timestep (Time): Current timestep.
-
-        Returns:
-            list: updated list of detected debris.
-            Time: Updated timestep.
-        """
-
-        # Move data to GPU
-        position_sat = cp.asarray(position_sat)
-        position_deb = cp.asarray(position_deb)
-
-
-        rel_positions = position_deb[:, cp.newaxis, :] - position_sat[cp.newaxis, :, :]     # relative positions of debris to satellites. shape: (total_debris, total_sats, 3)
-        distances = cp.linalg.norm(rel_positions, axis=2)                                   # distances between debris and satellites. shape: (total_debris, total_sats)
-        dotproducts = cp.sum(rel_positions*position_sat, axis=2)                            # dot product between relative positions and satellite positions. shape: (total_debris, total_sats)
-        normproducts = cp.linalg.norm(position_sat, axis=1)*distances                       # product of norms of relative and satellite positions. shape: (total_debris, total_sats)
-        angles = cp.arccos(dotproducts/normproducts) * (180 / cp.pi)                        # angles between debris and satellites. shape: (total_debris, total_sats)
-
-        self.update_timestep(distances)  # not actually doing anything, timstep is constant 
-        
-        debris_in_collision = cp.argwhere(distances < self.collision_range)                       # row indices of debris in collision
-        debris_in_collision = cp.unique(debris_in_collision[:, 0])
-        debris_in_FOV = cp.argwhere((distances < radar.max_range) & (angles < radar.FOV))               # row indices of debris in FOV
-        debris_in_FOV = cp.unique(debris_in_FOV[:, 0])
-
-
-        return debris_in_FOV.get(), debris_in_collision.get()
-
-    def simulation_loop_gpu(self, debris_orbits, total_debris, constellation:Constellation, radar:Radar, diameters, ex_pf=ex_pf,):
-        """
-        Run the simulation "loop" using GPU parallelization.
-        Processes one timestep at a time. Stores the results in the Simulation object.
-        
-        Args:
-            debris_orbits (list): List of Orbit objects representing the debris orbits.
-            total_debris (int): Number of debris particles to simulate.
-            constellation (Constellation): Constellation object.
-            radar (Radar): Radar object.
-            diameters (list): List of diameters of the debris particles. - unused
-            ex_pf (function): Probability function to detect debris. - unused
-        
-        Returns:
-            None
-        """
-        t = 0
-        self.timestep = self.max_timestep
-        self.position_deb = np.zeros((total_debris, 3))                     # debris positions in cartesian coordinates
-        self.position_sat = np.zeros((constellation.total_sats, 3))         # satellite positions in cartesian coordinates
-        #v_debs = np.zeros((total_debris, 3))
-        self.det_deb = []
-        self.col_deb = []
-        self.det_pos = np.zeros((total_debris, 3))
-        self.det_time = np.zeros(total_debris)
-
-
-        while t < self.simtime:
-
-            t += self.timestep
-            #print(format_time(t.to_value(u.s)))
-
-            # Calculate the positions of the debris and satellites at the current time
-            self.position_deb = propagate_all_orbits(debris_orbits, self.position_deb, t)
-            self.position_sat = propagate_all_orbits(constellation.sat_orbits, self.position_sat, t)
-
-
-            # Apply detection algorithm
-            debris_in_FOV, debris_in_collision=self.detect_debris_gpu(self.position_sat, self.position_deb, radar)
-            self.det_deb = np.append(self.det_deb, debris_in_FOV)
-            self.det_pos[debris_in_FOV] = self.position_deb[debris_in_FOV]
-            self.det_time[debris_in_FOV] = t
-            self.col_deb = np.append(self.col_deb, debris_in_collision)
-
-
-        self.det_deb = np.unique(self.det_deb)
-        self.det_deb = self.det_deb.astype(int)
-        self.col_deb = np.unique(self.col_deb)
-        self.col_deb = self.col_deb.astype(int)
-
-    def detect_debris_array(self, position_sat, position_deb, radar):
-        """
-        Fully vectorized CPU implementation of the detection algorithm.
-        Processes all timesteps at once.
-        
-        Args:
-            position_sat (cp.array): Shape (timesteps, total_sats, 3) - Satellite positions over time.
-            position_deb (cp.array): Shape (timesteps, total_debris, 3) - Debris positions over time.
-            radar (Radar): Radar object containing max_range and FOV attributes.
-
-        Returns:
-            cp.array: Indices of detected debris per timestep.
-            cp.array: Indices of collision debris per timestep.
-        """
-
-        # Compute relative positions: (T, D, S, 3)
-        rel_positions = position_deb[:, :, np.newaxis, :] - position_sat[:, np.newaxis, :, :]
-
-        # Compute distances: (T, D, S)
-        distances = np.linalg.norm(rel_positions, axis=3)
-
-        # Compute dot products: (T, D, S)
-        dotproducts = np.sum(rel_positions * position_sat[:, np.newaxis, :, :], axis=3)
-
-        # Compute norm products: (T, D, S)
-        normproducts = np.linalg.norm(position_sat, axis=2)[:, np.newaxis, :] * distances
-
-        # Compute angles: (T, D, S)
-        angles = np.arccos(np.clip(dotproducts / normproducts, -1.0, 1.0)) * (180 / np.pi)
-
-        # Find debris in collision range: (T, num_collisions)
-        debris_in_collision = np.unique(np.argwhere(distances < self.collision_range)[:, [0, 1]], axis=0)
-
-        # Find debris in radar FOV: (T, num_detected)
-        debris_in_FOV = np.unique(np.argwhere((distances < radar.max_range) & (angles < radar.FOV))[:, [0, 1]], axis=0)
-
-        return debris_in_FOV, debris_in_collision
-
-    def simulation_loop_array(self, debris_orbits, total_debris, constellation:Constellation, radar:Radar):
-        # not implemented, quite useless
-        # times = np.arange(self.starttime.to_value(u.s), self.simtime.to_value(u.s), self.timestep.to_value(u.s))
-
-        # positions_deb = np.zeros((len(times), total_debris, 3))
-        # print(positions_deb.shape)
-        # positions_sat = np.zeros((len(times), constellation.total_sats, 3))
-        # for i,t in enumerate(times):
-        #     positions_deb[i] = propagate_all_orbits(debris_orbits, positions_deb[i], t*u.s)
-        #     positions_sat[i] = propagate_all_orbits(constellation.sat_orbits, positions_sat[i], t*u.s)
-
-        # positions_deb = propagate_all_orbits_gpu(positions_deb_0, deb_v, times, debris_orbits)
-
-        # # Run detection for all timesteps at once
-        # debris_in_FOV, debris_in_collision = self.detect_debris_array(positions_sat, positions_deb, radar)
-
-        # # Flatten results across timesteps
-        # self.det_deb = np.unique(debris_in_FOV[:, 1]).astype(int)  # Unique debris indices detected
-        # self.col_deb = np.unique(debris_in_collision[:, 1]).astype(int)  # Unique debris indices in collision
-
-        # # Store positions and detection times
-        # self.det_pos = np.zeros((total_debris, 3))
-        # self.det_time = np.zeros(total_debris)
-        # for i, debris_idx in enumerate(self.det_deb):
-        #     first_detection = debris_in_FOV[debris_in_FOV[:, 1] == debris_idx, 0].min()  # First timestep it was detected
-        #     self.det_pos[debris_idx] = positions_deb[first_detection, debris_idx]
-        #     self.det_time[debris_idx] = times[first_detection]
-        pass
 
     def detect_debris_array_GPU(self, position_sat, position_deb, radar):
         """
@@ -613,37 +437,19 @@ class Simulation:
             
 
         Returns:
-            cp.array: Indices of detected debris.
-            cp.array: Indices of collision debris.
+            cp.array: detections array. Each row is a collision, column 1 is the time index, column 2 is the debris #, coumn 3 is te satellite #.
+            cp.array: collisions array, same indexing as above.
         """
         
-        # Compute relative positions: (T, D, S, 3). Careful: this is 7GB of RAM for 1000 debris, 440 satellites and 1440 timesteps
-        rel_positions = (position_deb[:, :, cp.newaxis, :] - position_sat[:, cp.newaxis, :, :])
-        
-        # max_rel_positions = cp.abs(cp.max(rel_positions))
-        # print("Max rel positions:",max_rel_positions)
+        # Careful: this is 7GB of RAM for 1000 debris, 440 satellites and 1440 timesteps
+        rel_positions = (position_deb[:, :, cp.newaxis, :] - position_sat[:, cp.newaxis, :, :]) # Shape: (T, D, S, 3)
 
-        # # Compute distances: (T, D, S)
-        # distances = cp.linalg.norm(rel_positions/max_rel_positions, axis=3)*max_rel_positions
-        #distances = cp.linalg.norm(rel_positions.astype(cp.float32), axis=3).astype(cp.float16)
-        distances = cp.linalg.norm(rel_positions, axis=3)
-        # distances = safe_norm(rel_positions, axis=3)
+        distances = cp.linalg.norm(rel_positions, axis=3)                                       # Shape: (T, D, S)
 
-        # Compute dot products: (T, D, S)
-        dotproducts = cp.sum(rel_positions * position_sat[:, cp.newaxis, :, :], axis=3)
-        
-        #print("Distances:",distances)
-        # Compute norm products: (T, D, S)
-        #normproducts = cp.linalg.norm(position_sat.astype(cp.float32), axis=2).astype(cp.float16)[:, cp.newaxis, :] * distances
-        normproducts = cp.linalg.norm(position_sat, axis=2)[:, cp.newaxis, :] * distances
-        #normproducts = safe_norm(position_sat, axis=2)[cp.newaxis, :, :] * distances
-        
-        # Compute angles: (T, D, S)
-        angles = cp.arccos(cp.clip(dotproducts / normproducts, -1.0, 1.0)) * (180 / cp.pi)
-        # print((rel_positions/distances[...,cp.newaxis]).shape)
-        # print(position_sat[:, cp.newaxis, :, :].shape)
-        # angles = cp.arccos(cp.dot(rel_positions/distances[...,cp.newaxis], position_sat[:, cp.newaxis, :, :])) * 180/cp.pi
-
+        dotproducts = cp.sum(rel_positions * position_sat[:, cp.newaxis, :, :], axis=3)         # Shape: (T, D, S)
+        normproducts = cp.linalg.norm(position_sat, axis=2)[:, cp.newaxis, :] * distances       # Shape: (T, D, S)
+        angles = cp.arccos(cp.clip(dotproducts / normproducts, -1.0, 1.0)) * (180 / cp.pi)      # Shape: (T, D, S)
+       
         # Find debris in collision range: (T, num_collisions)
         collisions = cp.unique(cp.argwhere(distances < self.collision_range), axis=0)
 
@@ -651,6 +457,7 @@ class Simulation:
         detections = cp.argwhere((distances < radar.max_range) & (angles < radar.FOV))
         
         return detections, collisions
+
 
     def simulation_loop_array_GPU(self, debris_orbits, total_debris, const:Constellation, radar:Radar, ):
         """
@@ -682,59 +489,64 @@ class Simulation:
         # Calculate batch size based on available memory
         free_memory, _ = cp.cuda.runtime.memGetInfo()
         # print("Free Memory (GB):", free_memory / 1e9)
+
         batch_size = int(free_memory* 0.9/ (2*(3*total_debris+3*const.total_sats+7*const.total_sats*total_debris)) ) # 4 bytes per float32, 0.8 factor for overhead
-        batch_size = 750
+        batch_size = 750 # because i cant get the batch calculated properly and this kinda works
+
         # Process timesteps in batches
         for i in range(0, (len(times)),batch_size):
         
             batch_times = times[i:i+batch_size]
-            # print(batch_times.shape)
-            # Initialize all times and empty arrays to store positions. Use float16 for reduced memory usage.Choose by uncommenting: float16 or float32. change dotproducts and normproducts in detect_debris accordingly.
-            # positions_deb = cp.zeros((len(batch_times), total_debris, 3), dtype=cp.float16)                 # Shape: (T, S, 3)
-            # positions_sat = cp.zeros((len(batch_times), const.total_sats, 3) , dtype=cp.float16)      # Shape: (T, D, 3)
 
-            positions_deb = cp.zeros((len(batch_times), total_debris, 3), dtype=cp.float32)                 # Shape: (T, S, 3)
+            # Initialize position arrays. Each row is a timestep, each row is a satellite/debris. Each element is a 3D vector storing the position
+            # Using float32 to keep acccuracy and reduce memory usage. float16 cannot be used because of overflow in cp.linalg.norm
+            positions_deb = cp.zeros((len(batch_times), total_debris, 3), dtype=cp.float32)           # Shape: (T, S, 3)
             positions_sat = cp.zeros((len(batch_times), const.total_sats, 3) , dtype=cp.float32)      # Shape: (T, D, 3)
-            # Propagate all orbits at all times using cowell()
+
+            # Propagate all orbits at all times using cowell(). cowell is the only function in poliastro that can propagate to an array of times
             positions_deb = propagate_all_orbits_gpu(positions_deb, batch_times, debris_orbits)
             positions_sat = propagate_all_orbits_gpu(positions_sat, batch_times, const.sat_orbits)
 
 
             
-            # Run detection for all timesteps at once
+            # Run detection for all timesteps in batch at once
             batch_detections, batch_collisions = self.detect_debris_array_GPU(positions_sat, positions_deb, radar)
-            # print(debris_in_FOV, debris_in_collision)
             detections = cp.concatenate((detections, batch_detections), axis=0)
             collisions = cp.concatenate((collisions, batch_collisions), axis=0)
 
-        detection_vals, detection_indices = cp.unique(detections[:,1], return_index=True)
-        collision_vals, collision_indices = cp.unique(collisions[:,1], return_index=True)
+        # Remove duplicates
+        _, detection_indices = cp.unique(detections[:,1], return_index=True)
+        _, collision_indices = cp.unique(collisions[:,1], return_index=True)
         detections = detections[detection_indices]
-        collisions = collisions[detection_indices]
+        collisions = collisions[collision_indices]
 
         free_memory, _ = cp.cuda.runtime.memGetInfo()
         # print("Free Memory (GB):", free_memory / 1e9)
-        # Flatten results across timesteps
-        detections = detections[1:]
-        self.det_deb = detections[:,1].astype(int)  # Unique debris indices detected
-        self.det_time = detections[:,0].astype(int)
-        self.det_sat = detections[:,2].astype(int)
-        self.det_pos= positions_deb[self.det_time, self.det_deb, :]
 
-        collisions = collisions[1:]
-        self.col_deb = collisions[:,1].astype(int)  # Unique debris indices in collision
+        # Store results in the Simulation object
+        detections = detections[1:]                                     # Remove first row (0,0,0)
+        self.det_deb = detections[:,1].astype(int)                      # column 1 of detections array is the debris index
+        self.det_time = detections[:,0].astype(int)                     # column 0 of detections array is the detection time index (not the actual time)
+        self.det_sat = detections[:,2].astype(int)                      # column 2 of detections array is the index of the satellite responsible for the detection
+        self.det_pos= positions_deb[self.det_time, self.det_deb, :]     # 3D positions of detected debris, obtained by extracting the positions of the detected debris at the detection time
+
+        collisions = collisions[1:]                                     # Same as above for collisions     
+        self.col_deb = collisions[:,1].astype(int)  
         self.col_time =  collisions[:,0].astype(int)
         self.col_sat = collisions[:,2].astype(int)
         self.col_pos= positions_deb[self.col_time, self.col_deb, :]
-        # Store positions and detection times - i really dont feel like doing this rn. 
         times = cp.asarray(times)
 
         
-        # # Convert results back to CPU
+        # Convert results back to CPU for plotting
         self.det_deb = self.det_deb.get()
         self.det_pos = self.det_pos.get()
         self.det_time = self.det_time.get()
-        self.col_deb = np.array([])
+    
+        self.col_deb = self.col_deb.get()
+        self.col_pos = self.col_pos.get()
+        self.col_time = self.col_time.get()
+
 
 
 
@@ -775,7 +587,16 @@ def plot_simulation_results(det_deb, position_deb, det_time):
 
     fig.show()
 
-def plot_simulation_results_gpu(det_deb, position_deb, det_time):
+def plot_simulation_results_gpu(sim:Simulation):
+    """
+    Plot the results of the simulation. This function is used when the simulation is run on the GPU.
+    
+    Args:
+        sim (Simulation): Simulation object containing the results of the simulation.
+        
+    Returns:
+        None
+    """
 
     fig = go.Figure()
 
@@ -788,12 +609,12 @@ def plot_simulation_results_gpu(det_deb, position_deb, det_time):
     fig.add_trace(earth_surface)
     max_distance = earth_radius.to_value(u.km) # remove unit
     # Plot positions of the generated debris field
-    for i in range(len(det_deb)):
+    for i in range(len(sim.det_deb)):
         fig.add_trace(
-            go.Scatter3d(x=[position_deb[i, 0]], y=[position_deb[i, 1]], z=[position_deb[i, 2]], mode='markers',
-                        marker=dict(color='red', size=2), name=f'D{i+1}@t={det_time[i]:.2f}') # why i+1?
+            go.Scatter3d(x=[sim.position_deb[i, 0]], y=[sim.position_deb[i, 1]], z=[sim.position_deb[i, 2]], mode='markers',
+                        marker=dict(color='red', size=2), name=f'D{i+1}@t={sim.det_time[i]:.2f}') # why i+1?
         )
-        max_distance = max(max_distance, np.max(np.abs(position_deb)))
+        max_distance = max(max_distance, np.max(np.abs(sim.position_deb)))
 
 
     max_distance += 1000
@@ -849,7 +670,7 @@ def main(sim:Simulation, const:Constellation, deb_orbits, deb_diameters, rad:Rad
         if not gpu:
             plot_simulation_results(sim.det_deb, sim.det_pos, sim.det_time)
         else:
-            plot_simulation_results_gpu(sim.det_deb, sim.det_pos, sim.det_time)
+            plot_simulation_results_gpu(sim)
 
     # Calculate the efficiency of the constellation
     collision_penalty = len(sim.col_deb)/len(deb_orbits)

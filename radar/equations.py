@@ -16,7 +16,7 @@ def calculate_peak_power_track(data,R=None):
     if R is None:
         R = data.R
     Pt_track = R**4*(4*np.pi)**3*data.SNR*k*data.Ts*data.B*data.L/(data.G**2*data.lamda**2*data.RCS)
-    return Pt_track
+    return Pt_track, Pt_track*data.eta
 
 
 def bandwidth_to_range_resolution(B):
