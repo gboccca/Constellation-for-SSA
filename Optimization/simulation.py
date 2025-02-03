@@ -704,7 +704,7 @@ if __name__ == "__main__":
 
     #### Constellation 
     sat_planes_number = 12                                  # Number of orbital planes for the satellites
-    sat_number = 4                                          # Number of satellites per plane
+    sat_number = 4                                          # Number of satellites per plane (or average)
     total_sats = sat_number * sat_planes_number
     sat_min_altitude = 450                                  # Altitude of the lowest satellite orbit
     #sat_raan_spacing = (360 / sat_planes_number)           # Right Ascension of the Ascending Node (RAAN) spacing
@@ -716,7 +716,7 @@ if __name__ == "__main__":
     #sat_distribution = [sat_number for i in range(sat_planes_number)]
     #w1, mu1, s1, wu2, mu2, s2 = doublegaussian_fit()
     w1, mu1, s1, wu2, mu2, s2 = 9.95456643, 789.88707892, 80.099526, 12.15301612, 1217.49579881, 458.32509372
-    sat_distribution, sat_altitudes = satellite_dist(w1 = w1, mu1=mu1, s1 = s1, w2 = wu2, mu2 = mu2, s2 = s2, num_obrits=sat_planes_number, num_sats=sat_number)
+    sat_distribution, sat_altitudes = satellite_dist(w1 = w1, mu1=mu1, s1 = s1, w2 = wu2, mu2 = mu2, s2 = s2, num_obrits=sat_planes_number, num_sats=total_sats)
     test_constellation = Constellation(altitudes=sat_altitudes, sat_distribution=sat_distribution, raan_spacing=sat_raan_spacing,  raan_0 = sat_raan_0, i_spacing = sat_inc_spacing, i_00=sat_inc_0)
 
     #### Debris 

@@ -114,6 +114,12 @@ def satellite_dist(**kwargs):
     scaled_dist = normalized_dist * num_sats
     discrete_dist = np.round(scaled_dist).astype(int)
 
+    # make sure one satellite is in each orbit
+    for i in range(num_obrits):
+        if discrete_dist[i] == 0:
+            discrete_dist[i] = 1
+
+
     # distribute remaining satellites in orbits closest to the distribution peak
     res = num_sats - np.sum(discrete_dist)
     peak_index = np.argmax(scaled_dist)
@@ -121,6 +127,9 @@ def satellite_dist(**kwargs):
     for i in range(res):
         discrete_dist[sorted_indices[i % num_obrits]] += 1
 
+
+    print(discrete_dist)
+    print(altitudes)
     return discrete_dist, altitudes
 
 
