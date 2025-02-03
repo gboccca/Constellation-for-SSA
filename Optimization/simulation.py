@@ -250,7 +250,7 @@ class Constellation:
                 true_anomaly = j * theta_spacing + theta_offset  # Spacing satellites evenly in the plane
                 orbit = Orbit.from_classical(
                     Earth,
-                    Earth.R + altitude,  # Semi-major axis (altitude above Earth's radius)
+                    (Earth.R + altitude)/(1-self.eccentricity),  # Semi-major axis (altitude above Earth's radius)
                     self.eccentricity * u.one,  # Eccentricity
                     inc,  # Inclination (defaulting to polar orbit, can be adjusted if needed)
                     raan,  # Right Ascension of Ascending Node
@@ -697,17 +697,17 @@ def main(sim:Simulation, const:Constellation, deb_orbits, deb_diameters, rad:Rad
 if __name__ == "__main__":
 
     #### Simulation 
-    time_of_flight = 0.5 * u.hour
+    time_of_flight = 2 * u.hour
     start_time = 0*u.s      # Start time of the simulation
     max_timestep = 5.0*u.s  # timestep of the simulation
     test_sim = Simulation (time_of_flight, start_time, max_timestep)
 
     #### Constellation 
-    sat_planes_number = 12            # Number of orbital planes for the satellites
-    sat_number = 40         # Number of satellites per plane
+    sat_planes_number = 12                                  # Number of orbital planes for the satellites
+    sat_number = 4                                          # Number of satellites per plane
     total_sats = sat_number * sat_planes_number
-    sat_min_altitude = 450       # Altitude of the lowest satellite orbit
-    #sat_raan_spacing = (360 / sat_planes_number)  # Right Ascension of the Ascending Node (RAAN) spacing
+    sat_min_altitude = 450                                  # Altitude of the lowest satellite orbit
+    #sat_raan_spacing = (360 / sat_planes_number)           # Right Ascension of the Ascending Node (RAAN) spacing
     sat_raan_spacing = 0
     sat_raan_0 = 0
     sat_inc_spacing = 0
@@ -720,9 +720,9 @@ if __name__ == "__main__":
     test_constellation = Constellation(altitudes=sat_altitudes, sat_distribution=sat_distribution, raan_spacing=sat_raan_spacing,  raan_0 = sat_raan_0, i_spacing = sat_inc_spacing, i_00=sat_inc_0)
 
     #### Debris 
-    use_new_dataset = False  # Set to False to use the test dataset, True to use the MASTER-2009 model
-    total_debris = 10000  # Number of debris particles to simulate. if not using the test dataset, can be arbitrarily chosen.
-                            # if using the test dataset, must be one of the following: 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000
+    use_new_dataset = False                                 # Set to False to use the test dataset, True to use the MASTER-2009 model
+    total_debris = 2000                                     # Number of debris particles to simulate. if not using the test dataset, can be arbitrarily chosen.
+                                                            # if using the test dataset, must be one of the following: 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000
 
     #### Radar
     radar = Radar()

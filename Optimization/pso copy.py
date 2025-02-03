@@ -530,8 +530,6 @@ def save_pso_results(gbest, gbest_eff, pso_history, gbest_history, n_particles, 
     print(f'Plots saved successfully to "Optimization/pso_plots/"')
         
 
-
-
 if __name__ == '__main__':
 
     # PSO Hyperparameters
@@ -552,8 +550,8 @@ if __name__ == '__main__':
     gpu = True
 
     # Constant constellation parameters
-    n_orbits = 12
-    n_sats = 40*12
+    n_orbits = 13
+    n_sats = 4*12
 
     # PSO parameters
     #opt_pars = ['raan_spacing', 'inclination', 'eccentricity']
