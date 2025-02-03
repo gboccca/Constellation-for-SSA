@@ -74,7 +74,7 @@ def satellite_dist(**kwargs):
         discrete_dist, altitudes
     """
 
-    required_kwargs = ['w1', 'mu1', 's1', 'w2', 'mu2', 's2', 'num_obrits', 'num_sats']
+    required_kwargs = ['w1', 'mu1', 's1', 'w2', 'mu2', 's2', 'num_obrits', 'num_sats', 'hmin']
 
     # unpack parameters
 
@@ -102,9 +102,10 @@ def satellite_dist(**kwargs):
     w2 = kwargs['w2']
     mu2 = kwargs['mu2']
     sigma2 = kwargs['s2']
+    hmin = kwargs['hmin']
 
     # generate discrete positions along distribution
-    altitudes = np.linspace(450, 1500, num_obrits)
+    altitudes = np.linspace(hmin, 1500, num_obrits)
     # generate distribution based on mean and std_deviation
     gmm_dist = (w1 * norm.pdf(altitudes, mu1, sigma1) +
                 w2 * norm.pdf(altitudes, mu2, sigma2))  # Sum of two Gaussians
@@ -128,8 +129,6 @@ def satellite_dist(**kwargs):
         discrete_dist[sorted_indices[i % num_obrits]] += 1
 
 
-    print(discrete_dist)
-    print(altitudes)
     return discrete_dist, altitudes
 
 

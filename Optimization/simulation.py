@@ -548,7 +548,6 @@ class Simulation:
         # Convert results back to CPU for plotting
         self.det_deb = self.det_deb.get()
         self.det_pos = self.det_pos.get()
-        print(self.det_pos)
         self.det_time = self.det_time.get()
 
         self.position_sat = self.position_sat.get()
@@ -572,7 +571,7 @@ def plot_simulation_results(det_deb, position_deb, det_time):
     x = 6371 * np.outer(np.cos(u_ang), np.sin(v_ang))
     y = 6371 * np.outer(np.sin(u_ang), np.sin(v_ang))
     z = 6371 * np.outer(np.ones(np.size(u_ang)), np.cos(v_ang))
-    earth_surface = go.Surface(x=x, y=y, z=z, colorscale='Blues', opacity=0.6, name='Earth')
+    earth_surface = go.Surface(x=x, y=y, z=z, colorscale='Blues', opacity=0.6, name='Earth', showscale=False)
     fig.add_trace(earth_surface)
     max_distance = earth_radius.to_value(u.km) # remove unit
     # Plot positions of the generated debris field
@@ -664,16 +663,10 @@ def main(sim:Simulation, const:Constellation, deb_orbits, deb_diameters, rad:Rad
     
     # Run the simulation
     start_stopwatch = time.time()
-    
-
-    #sim.simulation_loop(deb_orbits, total_debris, const, rad, deb_diameters)
-    #sim.simulation_loop_gpu(deb_orbits, total_debris, const, rad, deb_diameters)
-    #sim.simulation_loop_array(deb_orbits, total_debris, const, rad)
     if gpu:
         sim.simulation_loop_array_GPU(deb_orbits, total_debris, const, rad)
     else:
         sim.simulation_loop(deb_orbits, total_debris, const, rad, deb_diameters)
-    
     end_stopwatch = time.time()
     elapsed_time = end_stopwatch - start_stopwatch
 
@@ -716,12 +709,12 @@ if __name__ == "__main__":
     #sat_distribution = [sat_number for i in range(sat_planes_number)]
     #w1, mu1, s1, wu2, mu2, s2 = doublegaussian_fit()
     w1, mu1, s1, wu2, mu2, s2 = 9.95456643, 789.88707892, 80.099526, 12.15301612, 1217.49579881, 458.32509372
-    sat_distribution, sat_altitudes = satellite_dist(w1 = w1, mu1=mu1, s1 = s1, w2 = wu2, mu2 = mu2, s2 = s2, num_obrits=sat_planes_number, num_sats=total_sats)
+    sat_distribution, sat_altitudes = satellite_dist(w1 = w1, mu1=mu1, s1 = s1, w2 = wu2, mu2 = mu2, s2 = s2, num_obrits=sat_planes_number, num_sats=total_sats, hmin = sat_min_altitude)
     test_constellation = Constellation(altitudes=sat_altitudes, sat_distribution=sat_distribution, raan_spacing=sat_raan_spacing,  raan_0 = sat_raan_0, i_spacing = sat_inc_spacing, i_00=sat_inc_0)
 
     #### Debris 
     use_new_dataset = False                                 # Set to False to use the test dataset, True to use the MASTER-2009 model
-    total_debris = 2000                                     # Number of debris particles to simulate. if not using the test dataset, can be arbitrarily chosen.
+    total_debris = 1000                                     # Number of debris particles to simulate. if not using the test dataset, can be arbitrarily chosen.
                                                             # if using the test dataset, must be one of the following: 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000
 
     #### Radar
