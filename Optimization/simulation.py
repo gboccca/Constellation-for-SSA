@@ -10,6 +10,7 @@ from astropy import units as u
 from astropy.coordinates import CartesianRepresentation
 from astropy.time import Time, TimeDelta
 import plotly.graph_objects as go
+import plotly.io as pio
 import random
 import csv
 import time
@@ -168,8 +169,10 @@ class Constellation:
         # Basic Constellation Parameters. Altitudes and satellite distribution are required.
         self.altitudes = kwargs.get("altitudes")
         self.sat_distribution = kwargs.get("sat_distribution")
-        self.inclination = kwargs.get("inclination", 90)
-        self.raan_spacing = kwargs.get("raan_spacing", 360/len(self.altitudes))
+        self.i_spacing = kwargs.get("i_spacing", 0)
+        self.i_0 = kwargs.get("i_0", 90)
+        self.raan_spacing = kwargs.get("raan_spacing", 0)
+        self.raan_0 = kwargs.get("raan_0", 0)
         self.argument_periapsis = kwargs.get("argument_periapsis", 0)
         self.eccentricity = kwargs.get("eccentricity", 0)
         self.total_sats = sum(self.sat_distribution)
@@ -187,8 +190,10 @@ class Constellation:
         # Store the parameters as a dictionary and array, mainly for plotting in PSO runs. array is currently unused.
         self.asdict = { "altitudes": self.altitudes,
                         "sat_distribution": self.sat_distribution, 
-                        "inclination": self.inclination, 
-                        "raan_spacing": self.raan_spacing, 
+                        "i_spacing": self.i_spacing,
+                        "i_0": self.i_0,
+                        "raan_spacing": self.raan_spacing,
+                        "raam_0": self.raan_0,
                         "argument_periapsis": self.argument_periapsis, 
                         "eccentricity": self.eccentricity, 
                         "total_sats": self.total_sats, 
@@ -203,8 +208,10 @@ class Constellation:
 
         # Convert to astropy units
         self.altitudes *= u.km
-        self.inclination *= u.deg
+        self.i_spacing *= u.deg
+        self.i_0 *= u.deg
         self.raan_spacing *= u.deg
+        self.raan_0 *= u.deg
         self.argument_periapsis *= u.deg
 
 
@@ -236,8 +243,8 @@ class Constellation:
             num_sats = int(self.sat_distribution[i])          # Number of satellites in the current plane
             theta_spacing = 360/num_sats * u.deg    # Spacing between satellites in the plane (equally spaced)
             theta_offset = 360*i*u.deg/num_planes   # Offset per orbit to distribute satellites evenly in the constellation
-            raan = i * self.raan_spacing                 # RAAN for the current plane
-
+            raan = self.raan_0 + i * self.raan_spacing                 # RAAN for the current plane
+            inc = self.i_0 + i * self.i_spacing
 
             for j in range(num_sats):
                 true_anomaly = j * theta_spacing + theta_offset  # Spacing satellites evenly in the plane
@@ -245,7 +252,7 @@ class Constellation:
                     Earth,
                     Earth.R + altitude,  # Semi-major axis (altitude above Earth's radius)
                     self.eccentricity * u.one,  # Eccentricity
-                    self.inclination,  # Inclination (defaulting to polar orbit, can be adjusted if needed)
+                    inc,  # Inclination (defaulting to polar orbit, can be adjusted if needed)
                     raan,  # Right Ascension of Ascending Node
                     self.argument_periapsis,  # Argument of Periapsis
                     true_anomaly,  # True Anomaly
@@ -391,7 +398,7 @@ class Simulation:
         debris_in_FOV = np.unique(debris_in_FOV[:, 0])
         return debris_in_FOV, debris_in_collision
     
-    def simulation_loop(self, debris_orbits, total_debris, constellation:Constellation, radar:Radar, diameters, ex_pf=ex_pf,):
+    def simulation_loop(self, debris_orbits, total_debris, constellation:Constellation, radar:Radar, diameters):
         
         t = 0
         self.timestep = self.max_timestep
@@ -491,7 +498,7 @@ class Simulation:
         # print("Free Memory (GB):", free_memory / 1e9)
 
         batch_size = int(free_memory* 0.9/ (2*(3*total_debris+3*const.total_sats+7*const.total_sats*total_debris)) ) # 4 bytes per float32, 0.8 factor for overhead
-        batch_size = 750 # because i cant get the batch calculated properly and this kinda works
+        batch_size = 500 # because i cant get the batch calculated properly and this kinda works
 
         # Process timesteps in batches
         for i in range(0, (len(times)),batch_size):
@@ -500,17 +507,17 @@ class Simulation:
 
             # Initialize position arrays. Each row is a timestep, each row is a satellite/debris. Each element is a 3D vector storing the position
             # Using float32 to keep acccuracy and reduce memory usage. float16 cannot be used because of overflow in cp.linalg.norm
-            positions_deb = cp.zeros((len(batch_times), total_debris, 3), dtype=cp.float32)           # Shape: (T, S, 3)
-            positions_sat = cp.zeros((len(batch_times), const.total_sats, 3) , dtype=cp.float32)      # Shape: (T, D, 3)
+            self.position_deb = cp.zeros((len(batch_times), total_debris, 3), dtype=cp.float32)           # Shape: (T, S, 3)
+            self.position_sat = cp.zeros((len(batch_times), const.total_sats, 3) , dtype=cp.float32)      # Shape: (T, D, 3)
 
             # Propagate all orbits at all times using cowell(). cowell is the only function in poliastro that can propagate to an array of times
-            positions_deb = propagate_all_orbits_gpu(positions_deb, batch_times, debris_orbits)
-            positions_sat = propagate_all_orbits_gpu(positions_sat, batch_times, const.sat_orbits)
+            self.position_deb = propagate_all_orbits_gpu(self.position_deb, batch_times, debris_orbits)
+            self.position_sat = propagate_all_orbits_gpu(self.position_sat, batch_times, const.sat_orbits)
 
 
             
             # Run detection for all timesteps in batch at once
-            batch_detections, batch_collisions = self.detect_debris_array_GPU(positions_sat, positions_deb, radar)
+            batch_detections, batch_collisions = self.detect_debris_array_GPU(self.position_sat, self.position_deb, radar)
             detections = cp.concatenate((detections, batch_detections), axis=0)
             collisions = cp.concatenate((collisions, batch_collisions), axis=0)
 
@@ -528,20 +535,24 @@ class Simulation:
         self.det_deb = detections[:,1].astype(int)                      # column 1 of detections array is the debris index
         self.det_time = detections[:,0].astype(int)                     # column 0 of detections array is the detection time index (not the actual time)
         self.det_sat = detections[:,2].astype(int)                      # column 2 of detections array is the index of the satellite responsible for the detection
-        self.det_pos= positions_deb[self.det_time, self.det_deb, :]     # 3D positions of detected debris, obtained by extracting the positions of the detected debris at the detection time
+        self.det_pos= self.position_deb[self.det_time, self.det_deb, :]     # 3D positions of detected debris, obtained by extracting the positions of the detected debris at the detection time
 
         collisions = collisions[1:]                                     # Same as above for collisions     
         self.col_deb = collisions[:,1].astype(int)  
         self.col_time =  collisions[:,0].astype(int)
         self.col_sat = collisions[:,2].astype(int)
-        self.col_pos= positions_deb[self.col_time, self.col_deb, :]
+        self.col_pos= self.position_deb[self.col_time, self.col_deb, :]
         times = cp.asarray(times)
 
         
         # Convert results back to CPU for plotting
         self.det_deb = self.det_deb.get()
         self.det_pos = self.det_pos.get()
+        print(self.det_pos)
         self.det_time = self.det_time.get()
+
+        self.position_sat = self.position_sat.get()
+        self.position_deb = self.position_deb.get()
     
         self.col_deb = self.col_deb.get()
         self.col_pos = self.col_pos.get()
@@ -605,14 +616,14 @@ def plot_simulation_results_gpu(sim:Simulation):
     x = 6371 * np.outer(np.cos(u_ang), np.sin(v_ang))
     y = 6371 * np.outer(np.sin(u_ang), np.sin(v_ang))
     z = 6371 * np.outer(np.ones(np.size(u_ang)), np.cos(v_ang))
-    earth_surface = go.Surface(x=x, y=y, z=z, colorscale='Blues', opacity=0.6, name='Earth')
+    earth_surface = go.Surface(x=x, y=y, z=z, colorscale='Blues', opacity=0.6, name='Earth', showscale=False)
     fig.add_trace(earth_surface)
     max_distance = earth_radius.to_value(u.km) # remove unit
     # Plot positions of the generated debris field
     for i in range(len(sim.det_deb)):
         fig.add_trace(
-            go.Scatter3d(x=[sim.position_deb[i, 0]], y=[sim.position_deb[i, 1]], z=[sim.position_deb[i, 2]], mode='markers',
-                        marker=dict(color='red', size=2), name=f'D{i+1}@t={sim.det_time[i]:.2f}') # why i+1?
+            go.Scatter3d(x=[sim.det_pos[i, 0]], y=[sim.det_pos[i, 1]], z=[sim.det_pos[i, 2]], mode='markers',
+                        marker=dict(color='red', size=2), name=f'D{sim.det_deb[i]+1}@t={sim.det_time[i]*sim.timestep:.0f}') # why i+1?
         )
         max_distance = max(max_distance, np.max(np.abs(sim.position_deb)))
 
@@ -628,7 +639,7 @@ def plot_simulation_results_gpu(sim:Simulation):
     ),
         title='Detected debris',
         margin=dict(l=0, r=0, b=0, t=50))
-
+    pio.write_image(fig, r"Optimization\sim_results\lastsim.png")
     fig.show()
 
 
@@ -696,17 +707,21 @@ if __name__ == "__main__":
     sat_number = 40         # Number of satellites per plane
     total_sats = sat_number * sat_planes_number
     sat_min_altitude = 450       # Altitude of the lowest satellite orbit
-    sat_raan_spacing = (360 / sat_planes_number)  # Right Ascension of the Ascending Node (RAAN) spacing
+    #sat_raan_spacing = (360 / sat_planes_number)  # Right Ascension of the Ascending Node (RAAN) spacing
+    sat_raan_spacing = 0
+    sat_raan_0 = 0
+    sat_inc_spacing = 0
+    sat_inc_0 = 90
     #sat_altitudes = [sat_min_altitude + 75*i for i in range(sat_planes_number)]
     #sat_distribution = [sat_number for i in range(sat_planes_number)]
     #w1, mu1, s1, wu2, mu2, s2 = doublegaussian_fit()
     w1, mu1, s1, wu2, mu2, s2 = 9.95456643, 789.88707892, 80.099526, 12.15301612, 1217.49579881, 458.32509372
     sat_distribution, sat_altitudes = satellite_dist(w1 = w1, mu1=mu1, s1 = s1, w2 = wu2, mu2 = mu2, s2 = s2, num_obrits=sat_planes_number, num_sats=sat_number)
-    test_constellation = Constellation(altitudes=sat_altitudes, sat_distribution=sat_distribution, raan_spacing=sat_raan_spacing)
+    test_constellation = Constellation(altitudes=sat_altitudes, sat_distribution=sat_distribution, raan_spacing=sat_raan_spacing,  raan_0 = sat_raan_0, i_spacing = sat_inc_spacing, i_00=sat_inc_0)
 
     #### Debris 
     use_new_dataset = False  # Set to False to use the test dataset, True to use the MASTER-2009 model
-    total_debris = 1000  # Number of debris particles to simulate. if not using the test dataset, can be arbitrarily chosen.
+    total_debris = 10000  # Number of debris particles to simulate. if not using the test dataset, can be arbitrarily chosen.
                             # if using the test dataset, must be one of the following: 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000
 
     #### Radar
