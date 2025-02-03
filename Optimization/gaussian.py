@@ -7,7 +7,7 @@ from scipy.stats import norm
 from scipy.optimize import curve_fit
 from scipy.special import erf
 
-file_path_alt = "Optimization/master_results.txt"
+file_path_alt = r"C:\Users\bocca\OneDrive - TUM\Documenti\GitHub\Constellation-for-SSA\Optimization\master_results.txt"
 
 columns_alt = [
     "Altitude", "Expl-Fragm", "Coll_Fragm", "Launch/Mis", "NaK-Drops", "SRM-Slag", "SRM-Dust",
@@ -60,6 +60,67 @@ def skewed_gaussian_fit():
     
     params, _ = curve_fit(skewed_gaussian, data_alt['Altitude'], data_alt['Probability'], p0=p0)
     return params  # Returns weight, mu, sigma, alpha
+
+
+def satellite_dist(**kwargs):
+    """
+    Generate the satellite distribution from gasussian mixture model
+    kwargs (all required):
+
+        w1, mu1, sigma1, w2, mu2, sigma2, num_obrits, num_sats
+
+    returns:
+        discrete_dist, altitudes
+    """
+
+    required_kwargs = ['w1', 'mu1', 's1', 'w2', 'mu2', 's2', 'num_obrits', 'num_sats']
+
+    # unpack parameters
+
+    for key in required_kwargs:
+        if key not in kwargs:
+            raise ValueError(f'Missing required parameter {key}')
+
+    superfluous_kwargs = []
+    for key in kwargs:
+        if key not in required_kwargs:
+            superfluous_kwargs.append(key)
+
+    # this will be triggered every time if the function is called correctly
+    if superfluous_kwargs:
+        warnings.warn(f'Superfluous parameters: {superfluous_kwargs}')
+        # remove superfluous keys from kwargs
+        for key in superfluous_kwargs:
+            kwargs.pop(key)
+
+    num_obrits = kwargs['num_obrits']
+    num_sats = kwargs['num_sats']
+    w1 = kwargs['w1']
+    mu1 = kwargs['mu1']
+    sigma1 = kwargs['s1']
+    w2 = kwargs['w2']
+    mu2 = kwargs['mu2']
+    sigma2 = kwargs['s2']
+
+    # generate discrete positions along distribution
+    altitudes = np.linspace(450, 1500, num_obrits)
+    # generate distribution based on mean and std_deviation
+    gmm_dist = (w1 * norm.pdf(altitudes, mu1, sigma1) +
+                w2 * norm.pdf(altitudes, mu2, sigma2))  # Sum of two Gaussians
+
+    # generate discrete distribution
+    normalized_dist = gmm_dist / np.sum(gmm_dist)
+    scaled_dist = normalized_dist * num_sats
+    discrete_dist = np.round(scaled_dist).astype(int)
+
+    # distribute remaining satellites in orbits closest to the distribution peak
+    res = num_sats - np.sum(discrete_dist)
+    peak_index = np.argmax(scaled_dist)
+    sorted_indices = sorted(range(num_obrits), key=lambda x: abs(x - peak_index))
+    for i in range(res):
+        discrete_dist[sorted_indices[i % num_obrits]] += 1
+
+    return discrete_dist, altitudes
 
 
 if __name__ == '__main__':
