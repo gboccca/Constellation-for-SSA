@@ -12,7 +12,7 @@ time_of_flight = 2 * u.hour                                         # Time of fl
 start_time = 0*u.s                                                  # Start time of the simulation [s]
 max_timestep = 5.0*u.s                                              # timestep of the simulation [s]
 sim = Simulation (time_of_flight, start_time, max_timestep)         # Create a simulation object
-
+simid = "1.1"
 #### Radar
 radar = Radar()                                                     # Create a radar object
 
@@ -40,4 +40,4 @@ dist, altitudes = satellite_dist(num_orbits = num_orbits, num_sats = num_sats, w
 # Create a constellation object
 const = Constellation(altitudes = altitudes, sat_distribution = dist, i_spacing = i_spacing, i_0 = i_0, raan_spacing = raan_spacing, raan_0 = raan_0, eccentricity = e) 
 # Run the simulation, plot the results and return the efficiency
-consteff = main(sim, const, deb_orbits, deb_d, radar, plot = True, gpu = True, simid = input("Enter simulation ID: "), saveplot = True) 
+consteff = main(sim, const, deb_orbits, deb_d, radar, plot = True, gpu = True, simid = simid, saveplot = True) 

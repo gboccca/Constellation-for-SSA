@@ -545,8 +545,8 @@ class Simulation:
 
         # Initialize position arrays. Each row is a timestep, each row is a satellite/debris. Each element is a 3D vector storing the position
         # Using float32 to keep acccuracy and reduce memory usage. float16 cannot be used because of overflow in cp.linalg.norm
-        self.position_deb = cp.zeros((len(times), total_debris, 3), dtype=cp.float32)           # Shape: (T, S, 3)
-        self.position_sat = cp.zeros((len(times), const.total_sats, 3) , dtype=cp.float32)      # Shape: (T, D, 3)
+        self.position_deb = cp.zeros((len(times), total_debris, 3), dtype=cp.float32)           # Shape: (T, D, 3)
+        self.position_sat = cp.zeros((len(times), const.total_sats, 3) , dtype=cp.float32)      # Shape: (T, S, 3)
 
         # Calculate batch size based on available memory
         free_memory, _ = cp.cuda.runtime.memGetInfo()
@@ -558,14 +558,24 @@ class Simulation:
         # Process timesteps in batches
         for i in range(0, (len(times)),batch_size):
             #print(f"batch{i}")
-            batch_times = times[i:i+batch_size]
+            max_index = min(i+batch_size, len(times))
+            batch_times = times[i:max_index]
+
+            # print(max_index)
+            # print(i)
+            # print(batch_times)
+            # print(len(batch_times))
 
             # Propagate all orbits at all times using cowell(). cowell is the only function in poliastro that can propagate to an array of times. save positions in position_deb and position_sat, at the right indices
-            self.position_deb[i:i+batch_size, :, :] = propagate_all_orbits_gpu(cp.zeros((len(batch_times),total_debris,     3)), batch_times, debris_orbits)
-            self.position_sat[i:i+batch_size, :, :] = propagate_all_orbits_gpu(cp.zeros((len(batch_times),const.total_sats, 3)), batch_times, const.sat_orbits)
+            self.position_deb[i:max_index, :, :] = propagate_all_orbits_gpu(cp.zeros((len(batch_times),total_debris,     3)), batch_times, debris_orbits)
+            self.position_sat[i:max_index, :, :] = propagate_all_orbits_gpu(cp.zeros((len(batch_times),const.total_sats, 3)), batch_times, const.sat_orbits)
             
             # Run detection for all timesteps in batch at once. take only the right timesteps from the position arrays.
-            batch_detections, batch_collisions = self.detect_debris_array_GPU(self.position_sat[i:batch_size+i,:,:], self.position_deb[i:batch_size+i,:,:], radar)
+            batch_detections, batch_collisions = self.detect_debris_array_GPU(self.position_sat[i:max_index,:,:], self.position_deb[i:max_index,:,:], radar)
+            #print("batch_detections", batch_detections)
+            # correct batch time indices to global time indices
+            batch_detections[:,0] += i
+            batch_collisions[:,0] += i
             detections = cp.concatenate((detections, batch_detections), axis=0)
             collisions = cp.concatenate((collisions, batch_collisions), axis=0)
 
@@ -574,12 +584,13 @@ class Simulation:
         _, collision_indices = cp.unique(collisions[:,1], return_index=True)
         detections = detections[detection_indices]
         collisions = collisions[collision_indices]
+        detections = detections[1:]                                     # Remove first row (0,0,0)
+        #print("detections", detections)
 
         free_memory, _ = cp.cuda.runtime.memGetInfo()
         # print("Free Memory (GB):", free_memory / 1e9)
 
         # Store results in the Simulation object
-        detections = detections[1:]                                     # Remove first row (0,0,0)
         self.det_deb = detections[:,1].astype(int)                      # column 1 of detections array is the debris index
         self.det_time = detections[:,0].astype(int)                     # column 0 of detections array is the detection time index (not the actual time)
         self.det_sat = detections[:,2].astype(int)                      # column 2 of detections array is the index of the satellite responsible for the detection
@@ -689,11 +700,11 @@ def plot_simulation_results_gpu(sim:Simulation, simid, save=False):
                         marker=dict(color='blue', size=2), name=f'S{sim.det_sat[i]}D{sim.det_deb[i]+1}@t={sim.det_time[i]*sim.timestep:.0f}') 
         )
 
-        if sim.col_deb.any():
-            fig.add_trace(
-                go.Scatter3d(x=[sim.col_pos[i, 0]], y=[sim.col_pos[i, 1]], z=[sim.col_pos[i, 2]], mode='markers',
-                            marker=dict(color='black', size=2), name=f'D{sim.col_deb[i]+1}S{sim.col_sat[i]}@t={sim.col_time[i]*sim.timestep:.0f}') # why i+1?
-            )
+    for i in range(len(sim.col_deb)):
+        fig.add_trace(
+            go.Scatter3d(x=[sim.col_pos[i, 0]], y=[sim.col_pos[i, 1]], z=[sim.col_pos[i, 2]], mode='markers',
+                        marker=dict(color='black', size=2), name=f'D{sim.col_deb[i]+1}S{sim.col_sat[i]}@t={sim.col_time[i]*sim.timestep:.0f}') # why i+1?
+        )
 
     max_distance += 1000
 
