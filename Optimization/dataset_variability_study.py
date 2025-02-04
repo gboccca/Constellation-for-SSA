@@ -41,12 +41,12 @@ const = Constellation(altitudes = altitudes, sat_distribution = dist, i_spacing 
 
 # Run the simulation, plot the results and return the efficiency
 etalist = []
-# for i in range(10):
-#     deb_orbits, deb_d = generate_debris(debris_num, use_new_dataset)    # Generate the debris objects
-#     consteff = main(sim, const, deb_orbits, deb_d, radar, plot = True, gpu = True, simid = 'test', saveplot = False)
-#     etalist.append(consteff)
+for i in range(10):
+    deb_orbits, deb_d = generate_debris(debris_num, use_new_dataset)    # Generate the debris objects
+    consteff = main(sim, const, deb_orbits, deb_d, radar, plot = False, gpu = True, simid = 'test', saveplot = False)
+    etalist.append(consteff)
 
-etalist = [0.036, 0.039, 0.0435, 0.045, 0.0455, 0.048, 0.0505, 0.0505, 0.053, 0.056]
+#etalist = [0.036, 0.039, 0.0435, 0.045, 0.0455, 0.048, 0.0505, 0.0505, 0.053, 0.056]
 etalist = np.array(etalist)
 print('Mean efficiency:', np.mean(etalist))
 print('Standard deviation:', np.std(etalist))

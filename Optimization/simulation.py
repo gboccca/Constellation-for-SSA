@@ -557,7 +557,7 @@ class Simulation:
 
         # Process timesteps in batches
         for i in range(0, (len(times)),batch_size):
-            print(f"batch{i}")
+            #print(f"batch{i}")
             batch_times = times[i:i+batch_size]
 
             # Propagate all orbits at all times using cowell(). cowell is the only function in poliastro that can propagate to an array of times. save positions in position_deb and position_sat, at the right indices
