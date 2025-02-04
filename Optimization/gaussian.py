@@ -68,13 +68,13 @@ def satellite_dist(**kwargs):
     Generate the satellite distribution from gasussian mixture model
     kwargs (all required):
 
-        w1, mu1, sigma1, w2, mu2, sigma2, num_obrits, num_sats
+        w1, mu1, sigma1, w2, mu2, sigma2, num_orbits, num_sats
 
     returns:
         discrete_dist, altitudes
     """
 
-    required_kwargs = ['w1', 'mu1', 's1', 'w2', 'mu2', 's2', 'num_obrits', 'num_sats', 'hmin']
+    required_kwargs = ['w1', 'mu1', 's1', 'w2', 'mu2', 's2', 'num_orbits', 'num_sats', 'hmin']
 
     # unpack parameters
 
@@ -94,7 +94,7 @@ def satellite_dist(**kwargs):
         for key in superfluous_kwargs:
             kwargs.pop(key)
 
-    num_obrits = kwargs['num_obrits']
+    num_orbits = kwargs['num_orbits']
     num_sats = kwargs['num_sats']
     w1 = kwargs['w1']
     mu1 = kwargs['mu1']
@@ -105,7 +105,7 @@ def satellite_dist(**kwargs):
     hmin = kwargs['hmin']
 
     # generate discrete positions along distribution
-    altitudes = np.linspace(hmin, 1500, num_obrits)
+    altitudes = np.linspace(hmin, 1500, num_orbits)
     # generate distribution based on mean and std_deviation
     gmm_dist = (w1 * norm.pdf(altitudes, mu1, sigma1) +
                 w2 * norm.pdf(altitudes, mu2, sigma2))  # Sum of two Gaussians
@@ -116,7 +116,7 @@ def satellite_dist(**kwargs):
     discrete_dist = np.round(scaled_dist).astype(int)
 
     # make sure one satellite is in each orbit
-    for i in range(num_obrits):
+    for i in range(num_orbits):
         if discrete_dist[i] == 0:
             discrete_dist[i] = 1
 
@@ -124,9 +124,9 @@ def satellite_dist(**kwargs):
     # distribute remaining satellites in orbits closest to the distribution peak
     res = num_sats - np.sum(discrete_dist)
     peak_index = np.argmax(scaled_dist)
-    sorted_indices = sorted(range(num_obrits), key=lambda x: abs(x - peak_index))
+    sorted_indices = sorted(range(num_orbits), key=lambda x: abs(x - peak_index))
     for i in range(res):
-        discrete_dist[sorted_indices[i % num_obrits]] += 1
+        discrete_dist[sorted_indices[i % num_orbits]] += 1
 
 
     return discrete_dist, altitudes
