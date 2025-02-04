@@ -12,7 +12,7 @@ time_of_flight = 2 * u.hour                                         # Time of fl
 start_time = 0*u.s                                                  # Start time of the simulation [s]
 max_timestep = 5.0*u.s                                              # timestep of the simulation [s]
 sim = Simulation (time_of_flight, start_time, max_timestep)         # Create a simulation object
-simid = "1.1"
+simid = "11.0"
 #### Radar
 radar = Radar()                                                     # Create a radar object
 
@@ -21,9 +21,9 @@ num_orbits = 13                                                     # Number of 
 sats_per_orbit = 4                                                  # Number of satellites per orbit                  
 num_sats = num_orbits * sats_per_orbit                              # Number of satellites in the constellation
 hmin = 450                                                          # Minimum altitude of the constellation [km]
-raan_spacing = 0                                                    # Spacing between the orbits in the RAAN
+raan_spacing = 360/num_orbits                                                    # Spacing between the orbits in the RAAN
 raan_0 = 0                                                          # RAAN of the first orbit
-i_spacing = 0                                                       # Spacing between the orbits in the inclination
+i_spacing = 180/num_orbits                                                       # Spacing between the orbits in the inclination
 i_0 =  0                                                            # Inclination of the first orbit
 e = 0.00                                                            # Eccentricity of the orbits
 

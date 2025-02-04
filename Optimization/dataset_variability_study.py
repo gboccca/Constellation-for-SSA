@@ -41,7 +41,7 @@ const = Constellation(altitudes = altitudes, sat_distribution = dist, i_spacing 
 
 # Run the simulation, plot the results and return the efficiency
 etalist = []
-for i in range(1):
+for i in range(10):
     deb_orbits, deb_d = generate_debris(debris_num, use_new_dataset)    # Generate the debris objects
     consteff = main(sim, const, deb_orbits, deb_d, radar, plot = False, gpu = True, simid = 'test', saveplot = False)
     etalist.append(consteff)

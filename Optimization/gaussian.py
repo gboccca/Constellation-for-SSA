@@ -68,7 +68,7 @@ def satellite_dist(**kwargs):
     Generate the satellite distribution from gasussian mixture model
     kwargs (all required):
 
-        w1, mu1, sigma1, w2, mu2, sigma2, num_orbits, num_sats
+        w1, mu1, sigma1, w2, mu2, sigma2, num_orbits, num_sats, hmin
 
     returns:
         discrete_dist, altitudes

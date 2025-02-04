@@ -40,16 +40,18 @@ def call_function_with_kwargs(func, a:dict, b:dict, **kwargs):
 
 def pso_default_parameters():
 
-    default_num_planes = 12
-    default_inclination = 90    #deg
+    default_num_planes = 13
+    default_i0 = 0    #deg
+    default_ispacing = 0    #deg
     default_eccentricity = 0    #unitless
-    default_raan_spacing = 360/default_num_planes    #deg
+    default_raan_spacing = 0    #deg
+    default_raan_0 = 0    #deg
 
     w1, mu1, s1, w2, mu2, s2 = doublegaussian_fit()
 
 
     default_values = {
-        'inclination': default_inclination,
+        'i_spacing' : default_ispacing,
         'eccentricity': default_eccentricity,
         'raan_spacing': default_raan_spacing,
         'w1': w1,
@@ -60,10 +62,11 @@ def pso_default_parameters():
         's2': s2
     }
 
+
     default_bounds = {
-                    'raan_spacing': [0,180],
-                    'inclination': [0,90],
-                    'eccentricity': [0,0.9],
+                    'raan_spacing': [0,180/default_num_planes],
+                    'i_spacing': [0,180/default_num_planes],
+                    'eccentricity': [0,0.3],
                     'w1': [w1-5, w1+5],
                     'mu1': [mu1-100, mu1+100],
                     's1': [s1-50, s1+50],
@@ -108,7 +111,7 @@ def pso(n_particles, n_iterations, deb_number, n_orbits, n_sats, hmin, opt_pars,
     default_values, default_bounds = pso_default_parameters()
 
     # when a value is not specified in the kwargs, the default value is used
-    par_names = ['raan_spacing', 'inclination', 'eccentricity', 'w1', 'mu1', 's1', 'w2', 'mu2', 's2']
+    par_names = ['raan_spacing', 'i_spacing', 'eccentricity', 'w1', 'mu1', 's1', 'w2', 'mu2', 's2']
     for par in par_names:
         if par not in kwargs:
             kwargs[par] = default_values[par]
@@ -147,7 +150,7 @@ def pso(n_particles, n_iterations, deb_number, n_orbits, n_sats, hmin, opt_pars,
             deb_orbits, deb_diameters = generate_debris(deb_number, use_new_dataset)
 
         positions_dict = {opt_pars[n]:positions[n,p] for n in range(dim)}
-        satdist, altitudes = call_function_with_kwargs(satellite_dist, parameters, positions_dict, num_orbits=n_orbits, num_sats=n_sats, hmin = hmin),
+        satdist, altitudes = call_function_with_kwargs(satellite_dist, parameters, positions_dict, num_orbits=n_orbits, num_sats=n_sats, hmin = hmin)
         const = call_function_with_kwargs(Constellation, parameters, positions_dict, sat_distribution=satdist, altitudes=altitudes)
         consteff = main(sim, const, deb_orbits, deb_diameters, radar, plot=False, gpu=gpu, simid=f'0.{p}')
 
@@ -225,7 +228,7 @@ def pso(n_particles, n_iterations, deb_number, n_orbits, n_sats, hmin, opt_pars,
 
             positions_dict = {opt_pars[n]:positions[n,p] for n in range(dim)}
             # print('Positions dict:'); print(positions_dict)
-            satdist, altitudes = call_function_with_kwargs(satellite_dist, parameters, positions_dict, num_orbits=n_orbits, num_sats=n_sats)
+            satdist, altitudes = call_function_with_kwargs(satellite_dist, parameters, positions_dict, num_orbits=n_orbits, num_sats=n_sats, hmin=hmin)
             const = call_function_with_kwargs(Constellation, parameters, positions_dict, sat_distribution=satdist, altitudes=altitudes)
             # print(const)
             consteff = main(sim, const, deb_orbits, deb_diameters, radar, plot=False, simid=f'{i+1}.{p}')
@@ -397,6 +400,74 @@ def save_pso_results(gbest, gbest_eff, pso_history, gbest_history, n_particles, 
         plt.savefig(f'Optimization/pso_plots/{run_name}/eta_vs_{opt_pars[3]}_{opt_pars[4]}_{opt_pars[5]}.png')
         plt.close()
 
+    if len(opt_pars) == 8:
+
+        x = np.array([pso_history[j, i, 1].asdict[opt_pars[0]] for j in range(n_particles) for i in range(n_iterations)])
+        y = np.array([pso_history[j, i, 1].asdict[opt_pars[1]] for j in range(n_particles) for i in range(n_iterations)])
+        z = np.array([pso_history[j, i, 0] for j in range(n_particles) for i in range(n_iterations)]) 
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Create scatter plot and store the mappable object
+        scatter = ax.scatter(x, y, c=z, cmap='viridis')
+
+        # Add colorbar and associate it with the scatter plot
+        cbar = fig.colorbar(scatter, ax=ax, shrink=0.6, aspect=20, pad=0.1)
+        cbar.set_label('Efficiency')
+
+        ax.set_xlabel(opt_pars[0])
+        ax.set_ylabel(opt_pars[1])
+        ax.set_title(f'Efficiency vs {opt_pars[0]} and {opt_pars[1]}')
+
+        plt.savefig(f'Optimization/pso_plots/{run_name}/eta_vs_{opt_pars[0]}_{opt_pars[1]}.png')
+        plt.close()
+
+
+        x = np.array([pso_history[j,i,1].asdict[opt_pars[2]] for j in range(n_particles) for i in range(n_iterations)])
+        y = np.array([pso_history[j,i,1].asdict[opt_pars[3]] for j in range(n_particles) for i in range(n_iterations)])
+        z = np.array([pso_history[j,i,1].asdict[opt_pars[4]] for j in range(n_particles) for i in range(n_iterations)])
+        c = np.array([pso_history[j,i,0] for j in range(n_particles) for i in range(n_iterations)])
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        scatter = ax.scatter(x, y, z, c=c, cmap='viridis')
+
+        ax.set_xlabel(opt_pars[2])
+        ax.set_ylabel(opt_pars[3])
+        ax.set_zlabel(opt_pars[4])
+        ax.set_title(f'Efficiency vs {opt_pars[2]}, {opt_pars[3]} and {opt_pars[4]}')
+
+        cbar = fig.colorbar(scatter, ax=ax, shrink=0.6, aspect=20, pad=0.1)
+        cbar.set_label('Efficiency')
+
+        plt.savefig(f'Optimization/pso_plots/{run_name}/eta_vs_{opt_pars[2]}_{opt_pars[3]}_{opt_pars[4]}.png')
+        plt.close()
+
+        x = np.array([pso_history[j,i,1].asdict[opt_pars[5]] for j in range(n_particles) for i in range(n_iterations)])
+        y = np.array([pso_history[j,i,1].asdict[opt_pars[6]] for j in range(n_particles) for i in range(n_iterations)])
+        z = np.array([pso_history[j,i,1].asdict[opt_pars[7]] for j in range(n_particles) for i in range(n_iterations)])
+        c = np.array([pso_history[j,i,0] for j in range(n_particles) for i in range(n_iterations)])
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        scatter = ax.scatter(x, y, z, c=c, cmap='viridis')
+
+        ax.set_xlabel(opt_pars[5])
+        ax.set_ylabel(opt_pars[6])
+        ax.set_zlabel(opt_pars[7])
+        ax.set_title(f'Efficiency vs {opt_pars[5]}, {opt_pars[6]} and {opt_pars[7]}')
+
+        cbar = fig.colorbar(scatter, ax=ax, shrink=0.6, aspect=20, pad=0.1)
+        cbar.set_label('Efficiency')
+
+        plt.savefig(f'Optimization/pso_plots/{run_name}/eta_vs_{opt_pars[5]}_{opt_pars[6]}_{opt_pars[7]}.png')
+        plt.close()
+
+
+
     if len(opt_pars) == 9:
 
         x = np.array([pso_history[j,i,1].asdict[opt_pars[0]] for j in range(n_particles) for i in range(n_iterations)])
@@ -472,7 +543,7 @@ if __name__ == '__main__':
     inertia = 0.5   
     cognitive = 0.5
     social = 0.5
-    n_particles = 10
+    n_particles = 15
     n_iterations = 100
     run_name = input('Enter the name of the run: ')
 
@@ -492,7 +563,7 @@ if __name__ == '__main__':
 
     # PSO parameters
     #opt_pars = ['raan_spacing', 'inclination', 'eccentricity']
-    opt_pars = ['raan_spacing', 'inclination', 'eccentricity', 'w1', 'mu1', 's1', 'w2', 'mu2', 's2']
+    opt_pars = ['raan_spacing', 'i_spacing', 'w1', 'mu1', 's1', 'w2', 'mu2', 's2']
 
     # Run PSO and save results
     pso_start_time = time.time()

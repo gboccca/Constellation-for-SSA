@@ -183,7 +183,7 @@ class Constellation:
         self.altitudes = kwargs.get("altitudes")
         self.sat_distribution = kwargs.get("sat_distribution")
         self.i_spacing = kwargs.get("i_spacing", 0)
-        self.i_0 = kwargs.get("i_0", 90)
+        self.i_0 = kwargs.get("i_0", 0)
         self.raan_spacing = kwargs.get("raan_spacing", 0)
         self.raan_0 = kwargs.get("raan_0", 0)
         self.argument_periapsis = kwargs.get("argument_periapsis", 0)
