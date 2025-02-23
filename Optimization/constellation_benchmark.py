@@ -8,27 +8,26 @@ from astropy import units as u
 
 
 #### Simulation 
-time_of_flight = 2 * u.hour                                         # Time of flight of the simulation [h]
+time_of_flight = 24 * u.hour                                         # Time of flight of the simulation [h]
 start_time = 0*u.s                                                  # Start time of the simulation [s]
 max_timestep = 5.0*u.s                                              # timestep of the simulation [s]
 sim = Simulation (time_of_flight, start_time, max_timestep)         # Create a simulation object
-simid = "11.0"
+simid = "bigtime"
 #### Radar
 radar = Radar()                                                     # Create a radar object
 
 #### Constellation
-num_orbits = 13                                                     # Number of orbits in the constellation              
-sats_per_orbit = 4                                                  # Number of satellites per orbit                  
-num_sats = num_orbits * sats_per_orbit                              # Number of satellites in the constellation
+num_orbits = 14                                                     # Number of orbits in the constellation. 14 allows the entire LEO range to be covered.                              
+num_sats = 50                                                       # Number of satellites in the constellation. will be distributed according to the Gaussian Mixture Model.
 hmin = 450                                                          # Minimum altitude of the constellation [km]
-raan_spacing = 360/num_orbits                                                    # Spacing between the orbits in the RAAN
+raan_spacing = 0                                                    # Spacing between the orbits in the RAAN
 raan_0 = 0                                                          # RAAN of the first orbit
-i_spacing = 180/num_orbits                                                       # Spacing between the orbits in the inclination
+i_spacing = 0                                                       # Spacing between the orbits in the inclination
 i_0 =  0                                                            # Inclination of the first orbit
 e = 0.00                                                            # Eccentricity of the orbits
 
-# Parameters of the Gaussian Mixture Model
-w1, mu1, s1, w2, mu2, s2 = 9.95456643, 789.88707892, 80.099526, 12.15301612, 1217.49579881, 458.32509372                                                                
+# Parameters of the Gaussian Mixture Model  
+w1, mu1, s1, w2, mu2, s2 = 9.95456643, 789.88707892, 80.099526, 12.15301612, 1217.49579881, 458.32509372                # parameters learned through PSO run 2                                                  
 
 #### Debris
 debris_num = 2000                                                   # Number of debris objects
@@ -40,4 +39,4 @@ dist, altitudes = satellite_dist(num_orbits = num_orbits, num_sats = num_sats, w
 # Create a constellation object
 const = Constellation(altitudes = altitudes, sat_distribution = dist, i_spacing = i_spacing, i_0 = i_0, raan_spacing = raan_spacing, raan_0 = raan_0, eccentricity = e) 
 # Run the simulation, plot the results and return the efficiency
-consteff = main(sim, const, deb_orbits, deb_d, radar, plot = True, gpu = True, simid = simid, saveplot = True) 
+consteff = main(sim, const, deb_orbits, deb_d, radar, plot = False, gpu = True, simid = simid, saveplot = False) 

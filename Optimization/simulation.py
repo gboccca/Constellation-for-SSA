@@ -771,7 +771,7 @@ def main(sim:Simulation, const:Constellation, deb_orbits, deb_diameters, rad:Rad
 if __name__ == "__main__":
 
     #### Simulation 
-    time_of_flight = 0.71 * u.hour
+    time_of_flight = 2 * u.hour
     start_time = 0*u.s      # Start time of the simulation
     max_timestep = 5.0*u.s  # timestep of the simulation
     test_sim = Simulation (time_of_flight, start_time, max_timestep)
@@ -795,7 +795,7 @@ if __name__ == "__main__":
 
     #### Debris 
     use_new_dataset = False                                 # Set to False to use the test dataset, True to use the MASTER-2009 model
-    total_debris = 100                                     # Number of debris particles to simulate. if not using the test dataset, can be arbitrarily chosen.
+    total_debris = 2000                                     # Number of debris particles to simulate. if not using the test dataset, can be arbitrarily chosen.
                                                             # if using the test dataset, must be one of the following: 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000
 
     #### Radar
